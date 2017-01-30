@@ -16,5 +16,5 @@ int main() {
 	printf("Byte length of unicode string: %d\n", strlen(unicode_string));	
 	printf("Character length of unicode string: %d\n", ustrlen(unicode_string));
 
-	printf("%d\n", 'a'&128);
+	return 0;
 } 
