@@ -16,3 +16,7 @@ uchar* ustrcpy(uchar* dst, const uchar* src);
 
 // returns null if there was an error
 uchar* ustrncpy(uchar* dest, const uchar* src, size_t num);
+
+void print_uchar(uchar* uc);
+
+unsigned int get_uval(uchar* uc);

@@ -25,13 +25,15 @@ struct bdict read_torrent_file(const char* filename);
 
 int main() {
 	FILE* torrent_file;
-	uchar uc;
-	int i;
-	unsigned int n;
+	uchar utf8char[4];
 
 	torrent_file = fopen("./ubuntu.torrent", "rb");
-	printf("File opened successfully!\n");
 
+	printf("Enter a unicode character: ");
+	scanf("%4c", utf8char);
+
+	printf("%s\n", utf8char);
+	print_uchar(utf8char);
 
 	fclose(torrent_file);
 
