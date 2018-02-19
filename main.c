@@ -105,39 +105,51 @@ void parser_ctrl(FILE* torrent, struct parser_state* ps) {
 
 	switch (uc=fgetc(torrent)) {
 		case 'd':
-			ps.dts[ps.dts_i++] = uc;
+			ps->dts[ps->dts_i++] = uc;
 			read_dict(curr, torrent, &ps);
 			break;
 		case 'l':
-			ps.dts[ps.dts_i++] = uc;
+			ps->dts[ps->dts_i++] = uc;
 			read_list(curr, &ps);
 			break;
 		case 'i':
-			ps.dts[ps.dts_i++] = uc;
+			ps->dts[ps->dts_i++] = uc;
 			read_int(curr, &ps);
 			break;
 		case 'e':
-			ps.dts_i--;
+			ps->dts_i--;
 		default:
-			return NULL;
+			return;
 	}
 }
 
 void read_dict(struct bdict* dict, FILE* file, struct parser_state* ps) {
 	uchar uc;
+	int r_depth;
+	
+	r_depth = ps->dts_i;
 	
 	dict->val.dict = (struct bdict*)malloc(sizeof(struct bdict));
 	dict->val.dict->parent = dict;
 	dict = dict->val.dict;
 
-	uc=fgetc(file);
-	if (uc >= '0' && uc <= '9') {
-		fseek(file, -1, SEEK_CUR);
+	dict->key = read_elem(file);
+
+	while (1) {
+		if (uc >= '0' && uc <= '9') {
+			fseek(file, -1, SEEK_CUR);
+			dict->val.val = read_elem(file);
+		}
+		else
+			parser_ctrl(file, ps);
+
+
+		if (r_depth > ps->dts_i)
+			return;
+		dict->next = (struct bdict*)malloc(struct bdict);
+		dict = dict->next;
 		dict->key = read_elem(file);
 	}
-	else
-		parser_ctrl(file, ps);
-
 }
 
 // strings returned by this function are
