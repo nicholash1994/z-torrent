@@ -50,50 +50,6 @@ int main() {
 	return 0;
 } 
 
-/*
-struct bdict* read_torrent_file(const char* filename) {
-	FILE* torrent;
-	uchar uc;
-	uchar key_name[30];
-	struct bdict* root_dict;
-	struct bdict* curr;
-	int r_depth;
-
-	torrent = fopen(filename, "rb");
-	if (torrent == NULL) {
-		fprintf(stderr, "Error: torrent file couldn't be read!\n");
-		exit(-1);
-	}
-	
-	r_depth = 0;
-	curr = root_dict;
-	
-	while (1)
-		switch (uc=fgetc(torrent)) {
-		case 'd':
-			r_depth++;
-			read_dict(curr, torrent, &r_depth);
-			break;
-		case 'l':
-			r_depth++;
-			read_list(curr, torrent, &r_depth);
-			break;
-		case 'i':
-			r_depth++;
-			read_int(curr, torrent, &r_depth);
-			break;
-		case 'e':
-			r_depth--;
-		default:
-			return root_dict;
-		}
-	}
-
-
-}
-*/
-
-
 
 // returns NULL if the torrent file
 // is improperly formatted
@@ -116,7 +72,8 @@ struct bdict* read_torrent_file(const char* filename) {
 
 }
 
-// may change the name of this function
+// when a special character is encountered, (e.g. 'd', 'e', 'l')
+// this function decides what to do next
 void parser_ctrl(struct bdict* curr, FILE* torrent, int* r_depth) {
 	uchar uc;
 
@@ -140,9 +97,9 @@ void parser_ctrl(struct bdict* curr, FILE* torrent, int* r_depth) {
 	}
 }
 
-
-
-
+// This function reads a bencoded dictionary. Since entries in bencoded
+// dictionaries can also have dictionaries as their value, this function
+// plays a critical role in parsing torrent files.
 void read_dict(struct bdict* dict, FILE* file, int* r_depth) {
 	uchar uc;
 	int depth; // the recursion depth of the dictionary
@@ -155,6 +112,9 @@ void read_dict(struct bdict* dict, FILE* file, int* r_depth) {
 	// creating a dictionary as the value of the current dictionary
 	// and then navigating to it
 	dict->val.dict = (struct bdict*)malloc(sizeof(struct bdict));
+	// setting the previous dictionary (the one passed as
+	// an argument to this function) as the parent of the newly
+	// created dictionary
 	dict->val.dict->parent = dict;
 	dict = dict->val.dict;
 	dict->vtype = BDICT;
@@ -188,6 +148,7 @@ void read_dict(struct bdict* dict, FILE* file, int* r_depth) {
 		// need to be read, the following code just creates the
 		// next node in the dictionary, and navigates to it
 		dict->next = (struct bdict*)malloc(sizeof(struct bdict));
+		dict->next->parent = dict->parent;
 		dict = dict->next;
 		dict->key = read_elem(file);
 		dict->vtype = BDICT;
@@ -212,7 +173,7 @@ void read_list(struct bdict* dict, FILE* file, int* r_depth) {
 
 	// the only difference between a list and a dictionary
 	// (in terms of how they're implemented in this program)
-	// is that a list is simply a dictionary with they keys
+	// is that a list is simply a dictionary with it's entries' keys
 	// set to NULL.
 	dict->key = NULL;
 
@@ -231,15 +192,18 @@ void read_list(struct bdict* dict, FILE* file, int* r_depth) {
 		}
 
 		// if the last character which was read was 'e', then
-		// *r_depth will be less than depth when parser_ctrl
+		// *r_depth will be less than depth once parser_ctrl
 		// returns, which allows us to exit the loop (and the function)
 		if (depth > *r_depth)
+			// considered putting a break here instead of 
+			// a return
 			return;
 
 		// if there are more elements in the dictionary that
 		// need to be read, the following code just creates the
 		// next node in the dictionary, and navigates to it
 		dict->next = (struct bdict*)malloc(sizeof(struct bdict));
+		dict->next->parent = dict->parent;
 		dict = dict->next;
 		dict->key = NULL;
 		dict->vtype = BDICT;
@@ -261,11 +225,15 @@ char* read_elem(FILE* file) {
 	char* elem;
 	unsigned long size;
 	
+	// this section of code simply copies the length of the element
+	// into a buffer
 	i = 0;
 	while ((uc=fgetc(file)) != ':' && i < 30)
 		size_string[i++] = uc;
 	size_string[i] = '\0';
 
+	// this just converts the size_string to an actual integer
+	// and then allocates a string to store the actual element
 	size = strtoul(size_string, NULL, 10);
 	elem = (char*)malloc((1+size)*sizeof(char));
 
@@ -276,6 +244,29 @@ char* read_elem(FILE* file) {
 	return elem;
 }
 
+/*
 void read_int(struct bdict* dict, FILE* file, int* r_depth) {
+	char c;
+	int i;
+	char buffer[100];
 	
-}
+	i = 0;
+	while ((c=fgetc(file)) != 'e' && i < 99)
+		buffer[i++] = c;
+	buffer[i] = '\0';
+	
+	dict->vtype = BINT;
+	dict->val.b_int = strtol(buffer, NULL, 10);
+	
+*/
+
+
+
+
+
+
+
+
+
+
+
