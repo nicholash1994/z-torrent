@@ -33,16 +33,23 @@ void read_int(struct bdict* dict, FILE* file, int* r_depth);
 char* read_elem(FILE* file);
 struct bdict* read_torrent_file(const char* filename);
 void parser_ctrl(struct bdict* curr, FILE* torrent, int* r_depth);
+void print_bdict(struct bdict* dict);
+void print_bdict_h(struct bdict* dict, int depth);
+void print_record(struct bdict* dict);
 
 int main() {
 	FILE* torrent_file;
-	uchar utf8char[4];
+	struct bdict* dict;
 
+	/*
 	torrent_file = fopen("./ubuntu.torrent", "rb");
 	if (torrent_file == NULL) {
 		fprintf(stderr, "Error! Torrent file couldn't be opened!\n");
 		return -1;
 	}
+	*/
+	
+	dict = read_torrent_file("./ubuntu.torrent");
 		
 
 	fclose(torrent_file);
@@ -67,6 +74,7 @@ struct bdict* read_torrent_file(const char* filename) {
 		exit(-1);
 	}
 
+	r_depth = 0;
 	// this parses the dictionary
 	parser_ctrl(&root_dict, torrent, &r_depth);
 
@@ -79,19 +87,23 @@ void parser_ctrl(struct bdict* curr, FILE* torrent, int* r_depth) {
 
 	switch (uc=fgetc(torrent)) {
 		case 'd':
-			*r_depth++;
+			(*r_depth)++;
+			curr->vtype = BDICT;
 			read_dict(curr, torrent, r_depth);
 			break;
 		case 'l':
-			*r_depth++;
+			(*r_depth)++;
+			curr->vtype = BDICT;
 			read_list(curr, torrent, r_depth);
 			break;
 		case 'i':
-			*r_depth++;
+			(*r_depth)++;
+			curr->vtype = BINT;
 			read_int(curr, torrent, r_depth);
 			break;
 		case 'e':
-			*r_depth--;
+			(*r_depth)--;
+			break;
 		default:
 			return;
 	}
@@ -104,6 +116,10 @@ void read_dict(struct bdict* dict, FILE* file, int* r_depth) {
 	uchar uc;
 	int depth; // the recursion depth of the dictionary
 			   // that this function is parsing
+
+	// DEBUG
+	// printf("DEBUG: reading dictionary...\n");
+	// printf("DEBUG: r_depth: %d\n", *r_depth);
 	
 	// storing the recursion depth of the dictionary
 	// that's being read
@@ -130,7 +146,9 @@ void read_dict(struct bdict* dict, FILE* file, int* r_depth) {
 		// checking to see whether the value is a UTF-8 string
 		// or another datatype which is to be read by the parser
 		if (uc >= '0' && uc <= '9') {
+			dict->vtype = USTRING;
 			dict->val.val = read_elem(file);
+			print_record(dict);
 		}
 		else {
 			parser_ctrl(dict, file, r_depth);
@@ -140,6 +158,8 @@ void read_dict(struct bdict* dict, FILE* file, int* r_depth) {
 		// *r_depth will be less than depth when parser_ctrl
 		// returns, which allows us to exit the loop (and the function)
 		if (depth > *r_depth) {
+			// DEBUG
+			// printf("DEBUG: finished reading dictionary!\n");
 			dict->next = NULL;
 			return;
 		}
@@ -151,7 +171,6 @@ void read_dict(struct bdict* dict, FILE* file, int* r_depth) {
 		dict->next->parent = dict->parent;
 		dict = dict->next;
 		dict->key = read_elem(file);
-		dict->vtype = BDICT;
 	}
 }
 
@@ -159,6 +178,9 @@ void read_list(struct bdict* dict, FILE* file, int* r_depth) {
 	uchar uc;
 	int depth; // the recursion depth of the list
 			   // that this function is parsing
+
+	// printf("DEBUG: reading list...\n");
+	// printf("DEBUG: r_depth: %d\n", *r_depth);
 	
 	// storing the recursion depth of the list
 	// that's being read
@@ -169,7 +191,6 @@ void read_list(struct bdict* dict, FILE* file, int* r_depth) {
 	dict->val.dict = (struct bdict*)malloc(sizeof(struct bdict));
 	dict->val.dict->parent = dict;
 	dict = dict->val.dict;
-	dict->vtype = BDICT;
 
 	// the only difference between a list and a dictionary
 	// (in terms of how they're implemented in this program)
@@ -185,9 +206,13 @@ void read_list(struct bdict* dict, FILE* file, int* r_depth) {
 		// checking to see whether the value is a UTF-8 string
 		// or another datatype which is to be read by the parser
 		if (uc >= '0' && uc <= '9') {
+			dict->vtype = USTRING;
 			(dict->val).val = read_elem(file);
+			print_record(dict);
 		}
 		else {
+			// parser control will also determine the type of 
+			// record dict is
 			parser_ctrl(dict, file, r_depth);
 		}
 
@@ -195,6 +220,8 @@ void read_list(struct bdict* dict, FILE* file, int* r_depth) {
 		// *r_depth will be less than depth once parser_ctrl
 		// returns, which allows us to exit the loop (and the function)
 		if (depth > *r_depth)
+			printf("DEBUG: finished reading list!\n");
+			dict->next = NULL;
 			// considered putting a break here instead of 
 			// a return
 			return;
@@ -206,7 +233,6 @@ void read_list(struct bdict* dict, FILE* file, int* r_depth) {
 		dict->next->parent = dict->parent;
 		dict = dict->next;
 		dict->key = NULL;
-		dict->vtype = BDICT;
 	}
 }
 
@@ -235,6 +261,8 @@ char* read_elem(FILE* file) {
 	// this just converts the size_string to an actual integer
 	// and then allocates a string to store the actual element
 	size = strtoul(size_string, NULL, 10);
+	// DEBUG
+	printf("Size: %ul\n", size);
 	elem = (char*)malloc((1+size)*sizeof(char));
 
 	for (i = 0; i < size; i++)
@@ -244,11 +272,14 @@ char* read_elem(FILE* file) {
 	return elem;
 }
 
-/*
 void read_int(struct bdict* dict, FILE* file, int* r_depth) {
 	char c;
 	int i;
 	char buffer[100];
+
+	// DEBUG
+	printf("DEBUG: reading integer...\n");
+	printf("DEBUG: r_depth: %d\n", *r_depth);
 	
 	i = 0;
 	while ((c=fgetc(file)) != 'e' && i < 99)
@@ -257,11 +288,65 @@ void read_int(struct bdict* dict, FILE* file, int* r_depth) {
 	
 	dict->vtype = BINT;
 	dict->val.b_int = strtol(buffer, NULL, 10);
+
+	(*r_depth)--;
+}
+
+void print_bdict(struct bdict* dict) {
+	print_bdict_h(dict, 0);
+}
 	
-*/
+void print_bdict_h(struct bdict* dict, int depth) {
+	int i;
 
+	while (dict != NULL) {
+		for (i = 0; i < depth; i++)
+			printf(" ");
 
+		// print key name
+		if (dict->key == NULL)
+			printf("NULL: ");
+		else
+			printf("%s: ", dict->key);
 
+		// print value
+		switch (dict->vtype) {
+		case BINT:
+			for (i = 0; i < depth; i++)
+				printf(" ");
+			printf("%d\n", dict->val.b_int);
+			break;
+		case USTRING:
+			for (i = 0; i < depth; i++)
+				printf(" ");
+			printf("%s\n", dict->val.val);
+			break;
+		case BDICT:
+			print_bdict_h(dict->val.dict, depth+2);
+			break;
+		}
+		dict=dict->next;
+	}
+}
+
+void print_record(struct bdict* dict) {
+	if (dict->key == NULL)
+		printf("Key: NULL\n");
+	else
+		printf("Key: %s\n", dict->key);
+
+	switch (dict->vtype) {
+	case BINT:
+		printf("Value: %d\n\n", dict->val.b_int);
+		break;
+	case BDICT:
+		printf("Value: dictionary/list\n\n");
+		break;
+	case USTRING:
+		printf("Value: %s\n\n", dict->val.val);
+		break;
+	}
+}
 
 
 
