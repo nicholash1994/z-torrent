@@ -3,12 +3,9 @@
 #include <stdio.h>
 #include "unicode.h"
 
-enum val_type {USTRING, BDICT, BINT};
+#define PEEK_AHEAD(uc, file) {uc=fgetc(file); fseek(file, -1, SEEK_CUR);}
 
-struct parser_state {
-	char dts[100];
-	int dts_i;
-};
+enum val_type {USTRING, BDICT, BINT};
 
 union bval {
 	char* val;
@@ -138,8 +135,7 @@ void read_dict(struct bdict* dict, FILE* file, int* r_depth) {
 
 	while (1) {
 		// reading the next character
-		uc=fgetc(file);
-		fseek(file, -1, SEEK_CUR);
+		PEEK_AHEAD(uc, file);
 		
 		// checking to see whether the value is a UTF-8 string
 		// or another datatype which is to be read by the parser
@@ -162,19 +158,21 @@ void read_dict(struct bdict* dict, FILE* file, int* r_depth) {
 		// if there are more elements in the dictionary that
 		// need to be read, the following code just creates the
 		// next node in the dictionary, and navigates to it
-		dict->next = (struct bdict*)malloc(sizeof(struct bdict));
-		dict->next->parent = dict->parent;
-		dict = dict->next;
 			
-		uc=fgetc(file);
-		fseek(file, -1, SEEK_CUR);
-		if (uc >= '0' && uc <= '9')
+		PEEK_AHEAD(uc, file);
+		if (uc != 'e') {
+			dict->next = (struct bdict*)malloc(sizeof(struct bdict));
+			dict->next->parent = dict->parent;
+			dict = dict->next;
 			dict->key = read_elem(file);
+		}
 		else
 			parser_ctrl(dict, file, r_depth);
 	}
 }
 
+// TODO: rewrite this function. It could be a lot more concise
+// and much less complicated
 void read_list(struct bdict* dict, FILE* file, int* r_depth) {
 	uchar uc;
 	int depth; // the recursion depth of the list
@@ -198,8 +196,7 @@ void read_list(struct bdict* dict, FILE* file, int* r_depth) {
 
 	while (1) {
 		// reading the next character
-		uc=fgetc(file);
-		fseek(file, -1, SEEK_CUR);
+		PEEK_AHEAD(uc, file);
 
 		// checking to see whether the value is a UTF-8 string
 		// or another datatype which is to be read by the parser
@@ -226,10 +223,15 @@ void read_list(struct bdict* dict, FILE* file, int* r_depth) {
 		// if there are more elements in the dictionary that
 		// need to be read, the following code just creates the
 		// next node in the dictionary, and navigates to it
-		dict->next = (struct bdict*)malloc(sizeof(struct bdict));
-		dict->next->parent = dict->parent;
-		dict = dict->next;
-		dict->key = NULL;
+		PEEK_AHEAD(uc, file);
+		if (uc != 'e') {
+			dict->next = (struct bdict*)malloc(sizeof(struct bdict));
+			dict->next->parent = dict->parent;
+			dict = dict->next;
+			dict->key = NULL;
+		}
+		else
+			dict->next = NULL;
 	}
 }
 
@@ -284,19 +286,19 @@ void read_int(struct bdict* dict, FILE* file, int* r_depth) {
 }
 
 void print_bdict(struct bdict* dict) {
-	print_bdict_h(dict, 0);
+	print_bdict_h(dict->val.dict, 0);
 }
 	
 void print_bdict_h(struct bdict* dict, int depth) {
 	int i;
-
+	
 	while (dict != NULL) {
 		for (i = 0; i < depth; i++)
 			printf(" ");
 
 		// print key name
 		if (dict->key == NULL)
-			printf("NULL: ");
+			printf("*LIST*: ");
 		else
 			printf("%s: ", dict->key);
 
