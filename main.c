@@ -52,8 +52,7 @@ int main() {
 	dict = read_torrent_file("./ubuntu.torrent");
 		
 
-	fclose(torrent_file);
-
+	// print_bdict(dict);
 	return 0;
 } 
 
@@ -117,10 +116,6 @@ void read_dict(struct bdict* dict, FILE* file, int* r_depth) {
 	int depth; // the recursion depth of the dictionary
 			   // that this function is parsing
 
-	// DEBUG
-	// printf("DEBUG: reading dictionary...\n");
-	// printf("DEBUG: r_depth: %d\n", *r_depth);
-	
 	// storing the recursion depth of the dictionary
 	// that's being read
 	depth = *r_depth;
@@ -148,7 +143,6 @@ void read_dict(struct bdict* dict, FILE* file, int* r_depth) {
 		if (uc >= '0' && uc <= '9') {
 			dict->vtype = USTRING;
 			dict->val.val = read_elem(file);
-			print_record(dict);
 		}
 		else {
 			parser_ctrl(dict, file, r_depth);
@@ -158,8 +152,6 @@ void read_dict(struct bdict* dict, FILE* file, int* r_depth) {
 		// *r_depth will be less than depth when parser_ctrl
 		// returns, which allows us to exit the loop (and the function)
 		if (depth > *r_depth) {
-			// DEBUG
-			// printf("DEBUG: finished reading dictionary!\n");
 			dict->next = NULL;
 			return;
 		}
@@ -170,7 +162,13 @@ void read_dict(struct bdict* dict, FILE* file, int* r_depth) {
 		dict->next = (struct bdict*)malloc(sizeof(struct bdict));
 		dict->next->parent = dict->parent;
 		dict = dict->next;
-		dict->key = read_elem(file);
+			
+		uc=fgetc(file);
+		fseek(file, -1, SEEK_CUR);
+		if (uc >= '0' && uc <= '9')
+			dict->key = read_elem(file);
+		else
+			parser_ctrl(dict, file, r_depth);
 	}
 }
 
@@ -179,9 +177,6 @@ void read_list(struct bdict* dict, FILE* file, int* r_depth) {
 	int depth; // the recursion depth of the list
 			   // that this function is parsing
 
-	// printf("DEBUG: reading list...\n");
-	// printf("DEBUG: r_depth: %d\n", *r_depth);
-	
 	// storing the recursion depth of the list
 	// that's being read
 	depth = *r_depth;
@@ -208,7 +203,6 @@ void read_list(struct bdict* dict, FILE* file, int* r_depth) {
 		if (uc >= '0' && uc <= '9') {
 			dict->vtype = USTRING;
 			(dict->val).val = read_elem(file);
-			print_record(dict);
 		}
 		else {
 			// parser control will also determine the type of 
@@ -219,12 +213,12 @@ void read_list(struct bdict* dict, FILE* file, int* r_depth) {
 		// if the last character which was read was 'e', then
 		// *r_depth will be less than depth once parser_ctrl
 		// returns, which allows us to exit the loop (and the function)
-		if (depth > *r_depth)
-			printf("DEBUG: finished reading list!\n");
+		if (depth > *r_depth) {
 			dict->next = NULL;
 			// considered putting a break here instead of 
 			// a return
 			return;
+		}
 
 		// if there are more elements in the dictionary that
 		// need to be read, the following code just creates the
@@ -261,8 +255,6 @@ char* read_elem(FILE* file) {
 	// this just converts the size_string to an actual integer
 	// and then allocates a string to store the actual element
 	size = strtoul(size_string, NULL, 10);
-	// DEBUG
-	printf("Size: %ul\n", size);
 	elem = (char*)malloc((1+size)*sizeof(char));
 
 	for (i = 0; i < size; i++)
@@ -277,10 +269,6 @@ void read_int(struct bdict* dict, FILE* file, int* r_depth) {
 	int i;
 	char buffer[100];
 
-	// DEBUG
-	printf("DEBUG: reading integer...\n");
-	printf("DEBUG: r_depth: %d\n", *r_depth);
-	
 	i = 0;
 	while ((c=fgetc(file)) != 'e' && i < 99)
 		buffer[i++] = c;
