@@ -52,7 +52,7 @@ int main() {
 	dict = read_torrent_file("./ubuntu.torrent");
 		
 
-	// print_bdict(dict);
+	print_bdict(dict);
 	return 0;
 } 
 
@@ -64,18 +64,21 @@ struct bdict* read_torrent_file(const char* filename) {
 	uchar uc;
 	uchar key_name[30];
 	int r_depth;
-	struct bdict root_dict;
-	struct bdict* curr;
+	struct bdict* root_dict;
 
 	torrent = fopen(filename, "rb");
 	if (torrent == NULL) {
 		fprintf(stderr, "Error: torrent file couldn't be read!\n");
 		exit(-1);
 	}
+	
+	root_dict = (struct bdict*)malloc(sizeof(struct bdict));
 
 	r_depth = 0;
 	// this parses the dictionary
-	parser_ctrl(&root_dict, torrent, &r_depth);
+	parser_ctrl(root_dict, torrent, &r_depth);
+
+	return root_dict;
 
 }
 
@@ -307,9 +310,13 @@ void print_bdict_h(struct bdict* dict, int depth) {
 		case USTRING:
 			for (i = 0; i < depth; i++)
 				printf(" ");
-			printf("%s\n", dict->val.val);
+			if (dict->key != NULL && !strncmp(dict->key, "pieces", 6))
+				printf("pieces...\n");
+			else
+				printf("%s\n", dict->val.val);
 			break;
 		case BDICT:
+			printf("\n");
 			print_bdict_h(dict->val.dict, depth+2);
 			break;
 		}
