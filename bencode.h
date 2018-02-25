@@ -31,6 +31,7 @@ void parser_ctrl(struct bdict* curr, FILE* torrent, int* r_depth);
 void print_bdict(struct bdict* dict);
 void print_bdict_h(struct bdict* dict, int depth);
 void print_record(struct bdict* dict);
-
+char* get_announce_url(struct bdict* dict);
+void encode_bdict(struct bdict* dict, FILE* output);
 
 #endif

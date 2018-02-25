@@ -25,6 +25,8 @@ struct bdict* read_torrent_file(const char* filename) {
 	// this parses the dictionary
 	parser_ctrl(root_dict, torrent, &r_depth);
 
+	fclose(torrent);
+
 	return root_dict;
 
 }
@@ -296,9 +298,60 @@ void print_record(struct bdict* dict) {
 }
 
 
+char* get_announce_url(struct bdict* dict) {
+	dict = dict->val.dict;
 
+	while (dict != NULL) {
+		if (strncmp(dict->key, "announce", 8) == 0)
+			return dict->val.val;
+		else
+			dict = dict->next;
+	}
 
+	return NULL;
+}
 
+void encode_bdict(struct bdict* dict, FILE* output) {
+	int depth;
 
+	dict = dict->val.dict;
 
-
+	depth = 0;
+	
+	while (1) {
+		if (dict->key != NULL) {
+			fprintf(output, "%d:", strlen(dict->key));
+			fwrite(dict->key, 1, strlen(dict->key), output);
+		}
+		
+		switch (dict->vtype) {
+		case USTRING:
+			fprintf(output, "%d:", strlen(dict->val.val));
+			fwrite(dict->val.val, 1, strlen(dict->val.val), output);
+			break;
+		case BINT:
+			fprintf(output, "i%de", dict->val.b_int);
+			break;
+		case BDICT:
+			depth++;
+			dict = dict->val.dict;
+			if (dict->key == NULL)
+				fprintf(output, "l");
+			else
+				fprintf(output, "d");
+			continue;
+		}
+		if (dict->next == NULL) {
+			fputc('e', output);
+			if (depth == 0) {
+				return;
+			}
+			else {
+				depth--;
+				dict = dict->parent;
+			}
+		}
+		else
+			dict = dict->next;
+	}
+}
