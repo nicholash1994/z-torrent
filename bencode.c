@@ -312,28 +312,66 @@ char* get_announce_url(struct bdict* dict) {
 }
 
 void encode_bdict(struct bdict* dict, FILE* output) {
-	int depth;
-
-	dict = dict->val.dict;
-
-	depth = 0;
+	bdict_stack_t stack;
+	init_bdict_stack(&stack, 256);
+	// these variables are needed in order to determine
+	// how long the string stored in the "pieces" record is
+	int len;
+	int piece_len;
 	
-	while (1) {
-		if (dict->key != NULL) {
-			fprintf(output, "%d:", strlen(dict->key));
-			fwrite(dict->key, 1, strlen(dict->key), output);
-		}
-		
+	struct bdict* tmp;
+	
+	dict = dict->val.dict;
+	
+	// getting len and piece_len
+	tmp = dict;
+	while (dict != NULL) {
+		if (strcmp("length", dict->key) == 0)
+			len = dict->val.b_int;
+		else if (strcmp("piece length", dict->key) == 0)
+			piece_len = dict->val.b_int;
+		dict = dict->next;
+	}
+	dict = tmp;
+	
+	fprintf(output, "d");
+	
+	while (dict != NULL) {
+		// printing the current record
 		switch (dict->vtype) {
 		case USTRING:
-			fprintf(output, "%d:", strlen(dict->val.val));
-			fwrite(dict->val.val, 1, strlen(dict->val.val), output);
+			if (dict->key != NULL) {
+				fprintf(output, "%lu:", strlen(dict->key));
+				fwrite(dict->key, 1, strlen(dict->key), output);
+
+			}
+			if (dict->key != NULL && strncmp(dict->key, "pieces", 6) == 0) {
+				fprintf(output, "%d:", ((len/piece_len)+1)*20);
+				fwrite(dict->val.val, 1, ((len/piece_len)+1)*20, output);
+			}
+			else {
+				fprintf(output, "%lu:", strlen(dict->val.val));
+				fwrite(dict->val.val, 1, strlen(dict->val.val), output);
+			}
 			break;
 		case BINT:
+			if (dict->key != NULL) {
+				fprintf(output, "%lu:", strlen(dict->key));
+				fwrite(dict->key, 1, strlen(dict->key), output);
+				if (strncmp(dict->key, "length", 6) == 0)
+					len = dict->val.b_int;
+				if (strncmp(dict->key, "piece length", 12) == 0)
+					piece_len = dict->val.b_int;
+			}
+
 			fprintf(output, "i%de", dict->val.b_int);
 			break;
 		case BDICT:
-			depth++;
+			if (dict->key != NULL) {
+				fprintf(output, "%lu:", strlen(dict->key));
+				fwrite(dict->key, 1, strlen(dict->key), output);
+			}	
+			push_bdict(&stack, dict);
 			dict = dict->val.dict;
 			if (dict->key == NULL)
 				fprintf(output, "l");
@@ -341,17 +379,50 @@ void encode_bdict(struct bdict* dict, FILE* output) {
 				fprintf(output, "d");
 			continue;
 		}
-		if (dict->next == NULL) {
-			fputc('e', output);
-			if (depth == 0) {
-				return;
+
+		// if dict doesn't have a record following it, either
+		// navigate to the parent dictionary, or, if there is none,
+		// set dict to dict->next (which would be NULL in this case)
+		// which will cause the loop to finish executing
+		while (dict->next == NULL) {
+			if (stack.size > 0) {
+				fputc('e', output);
+				dict = pop_bdict(&stack);
 			}
 			else {
-				depth--;
-				dict = dict->parent;
+				fprintf(output, "e");
+				break;
 			}
 		}
-		else
-			dict = dict->next;
+		dict = dict->next;
 	}
+}
+
+void init_bdict_stack(bdict_stack_t* stack, int block_size) {
+	stack->stack = NULL;
+	stack->block_size = block_size;
+	stack->size = 0;
+}
+
+void destroy_bdict_stack(bdict_stack_t* stack) {
+	if (stack->stack != NULL)
+		free(stack->stack);
+}
+
+void push_bdict(bdict_stack_t* stack, struct bdict* val) {
+	if (stack->size%stack->block_size == 0)
+		// stack->stack will be NULL if this is the first element
+		// that's being pushed onto the list
+		if (stack->stack == NULL)
+			stack->stack = 
+				(struct bdict**)malloc(
+						stack->block_size*sizeof(struct bdict*));
+		else
+			stack->stack = (struct bdict**)realloc(stack->stack,
+				(stack->size+stack->block_size)*sizeof(struct bdict*));
+	stack->stack[stack->size++] = val;
+}
+
+struct bdict* pop_bdict(bdict_stack_t* stack) {
+	return stack->stack[--stack->size];
 }

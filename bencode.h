@@ -1,5 +1,5 @@
-#ifndef __BENCODE_H
-#define __BENCODE_H
+#ifndef _BENCODE_H
+#define _BENCODE_H
 
 #define PEEK_AHEAD(uc, file) {uc=fgetc(file); fseek(file, -1, SEEK_CUR);}
 
@@ -22,6 +22,11 @@ struct bdict {
 	struct bdict* parent;
 };
 
+typedef struct bdict_stack {
+	struct bdict** stack;
+	int size, block_size;
+} bdict_stack_t;
+
 void read_dict(struct bdict* dict, FILE* file, int* r_depth);
 void read_list(struct bdict* dict, FILE* file, int* r_depth);
 void read_int(struct bdict* dict, FILE* file, int* r_depth);
@@ -33,5 +38,11 @@ void print_bdict_h(struct bdict* dict, int depth);
 void print_record(struct bdict* dict);
 char* get_announce_url(struct bdict* dict);
 void encode_bdict(struct bdict* dict, FILE* output);
+void init_bdict_stack(bdict_stack_t* stack, int block_size);
+void destroy_bdict_stack(bdict_stack_t*);
+struct bdict* pop_bdict(bdict_stack_t*);
+void push_bdict(bdict_stack_t*, struct bdict*);
+
+
 
 #endif

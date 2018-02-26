@@ -5,55 +5,26 @@
 #include <sys/socket.h>
 #include <netdb.h>
 #include "bencode.h"
+#include "http.h"
+#include <rhash.h>
 
 int main(int argc, char** argv) {
-	struct bdict* dict;
+	struct bdict* torrent;
 	char* filename;
 	int i, tracker_fd;
 	char* announce_url;
 	FILE* tracker_fp;
 	FILE* tracker_res;
-	FILE* ubuntu_info;
+	FILE* my_file_pointer;
 	struct addrinfo hints, tracker_addr;
 	struct addrinfo* res;
 	struct hostent* host;
-
-	dict = read_torrent_file("./ubuntu.torrent");
-	dict = dict->val.dict;
-	while (strncmp(dict->key, "info", 4) != 0)
-		dict = dict->next;
-
-	ubuntu_info = fopen("ubuntu_info", "wb");
-	encode_bdict(dict, ubuntu_info);
-	fclose(ubuntu_info);
-	dict = dict->parent;
 	
-	announce_url = get_announce_url(dict);
-	if (announce_url == NULL) {
-		fprintf(stderr, "Error: announce url not found");
-		return -1;
-	}
-	announce_url="torrent.ubuntu.com";
-	memset(&hints, 0, sizeof(struct addrinfo));
-	hints.ai_family = AF_INET;
-	hints.ai_socktype = SOCK_STREAM;
-	i = getaddrinfo(announce_url, "6969", NULL, &res);
+	char url_hash[61];
 
-	if (i != 0) {
-		fprintf(stderr, "Error: %s\n", gai_strerror(i));
-		exit(-1);
-	}
-
-	if (res == NULL) {
-		fprintf(stderr, "Error: couldn't connect to tracker!\n");
-		return -1;
-	}
-	tracker_addr = res[0];
+	get_url_enc_info_hash(torrent, url_hash);
+	printf("%s\n\n", url_hash);
 	
-	tracker_fp = fdopen(tracker_fd=socket(AF_INET, SOCK_STREAM, 0), "ab");
-	
-	
-
 	return 0;
 } 
 
