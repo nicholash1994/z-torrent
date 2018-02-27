@@ -14,31 +14,7 @@ void get_url_enc_info_hash(struct bdict* torrent, char* dst) {
 	torrent = read_torrent_file("ubuntu.torrent");
 	torrent = torrent->val.dict;
 	while (strncmp(torrent->key, "info", 4) != 0)
-		torrent = torrent->next;
- 
-/*
-	torrent = torrent->val.dict;
-	b[0] = torrent;
-	b[1] = torrent->next;
-	b[2] = torrent->next->next;
-	b[3] = torrent->next->next->next;
-	
-	for (i = 0; i < 4; i++) {
-		min = b[k=i];
-		for (j = i+1; j < 4; j++) {
-			if (strcmp(b[j]->key, min->key) < 0)
-				min = b[k=j];
-		}
-		torrent = b[i];
-		b[i] = b[k];
-		b[k] = torrent;
-	}
-	for (i = 0; i < 3; i++)
-		b[i]->next = b[i+1];
-	b[3]->next = NULL;
-	torrent = b[0]->parent; 
-	torrent->val.dict = b[0];
-*/			
+		torrent = torrent->next;			
 
 	info_file = fopen("/tmp/ztorrent.info", "wb");
 	encode_bdict(torrent, info_file);
