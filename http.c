@@ -3,7 +3,62 @@
 #include <stdlib.h>
 #include "bencode.h"
 #include "http.h"
+#include <time.h>
+#include <sys/socket.h>
+#include <sys/types.h>
+#include <netdb.h>
 #include <rhash.h>
+
+void send_start_msg(struct bdict* torrent) {
+	char msg[1024];
+	char url_enc_hash[61];
+	char* hostname;
+	char peer_id[20];
+	struct addrinfo hints, *res;
+	struct bdict* dict;
+	int i;
+
+	i = 0;
+
+	// getting the hostname
+	dict = torrent->val.dict;
+	while (dict != NULL) {
+		if (dict->vtype == USTRING && strcmp(dict->key, "announce") == 0)
+			break;
+		dict = dict->next;
+	}
+	hostname = (char*)malloc(strlen(dict->val.val)+1);
+	strcpy(hostname, dict->val.val);
+	get_hostname_from_url(hostname);
+	
+	// getting the info hash
+	get_url_enc_info_hash(torrent, url_enc_hash);
+
+	// generating the peer id
+	srand(time(NULL));
+	for (i = 0; i < 20; i++)
+		peer_id[i] = rand()%0x100;
+	
+	memset(&hints, 0, sizeof(struct addrinfo));
+	hints.ai_family = AF_INET;
+	hints.ai_socktype = SOCK_STREAM;
+
+	getaddrinfo(hostname, "http", &hints, &res);
+
+}
+
+void get_hostname_from_url(char* url) {
+	int i; // index into url
+	int j;
+
+	for (i = 7; i < strlen(url); i++)
+		if (url[i] == '/' || url[i] == ':') {
+			url[i-7] = '\0';
+			break;
+		}
+		else
+			url[i-7] = url[i];
+}
 
 // dst must be at least 61 bytes
 void get_url_enc_info_hash(struct bdict* torrent, char* dst) {
@@ -11,7 +66,6 @@ void get_url_enc_info_hash(struct bdict* torrent, char* dst) {
 	char hash[20];
 	
 
-	torrent = read_torrent_file("ubuntu.torrent");
 	torrent = torrent->val.dict;
 	while (strncmp(torrent->key, "info", 4) != 0)
 		torrent = torrent->next;			

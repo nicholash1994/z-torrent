@@ -9,21 +9,16 @@
 #include <rhash.h>
 
 int main(int argc, char** argv) {
-	struct bdict* torrent;
-	char* filename;
-	int i, tracker_fd;
-	char* announce_url;
-	FILE* tracker_fp;
-	FILE* tracker_res;
-	FILE* my_file_pointer;
-	struct addrinfo hints, tracker_addr;
-	struct addrinfo* res;
-	struct hostent* host;
-	
-	char url_hash[61];
+	struct bdict *torrent;
 
-	get_url_enc_info_hash(torrent, url_hash);
-	printf("%s\n\n", url_hash);
+	if (argc < 2) {
+		fprintf(stderr, "Error: file not specified");
+		return -1;
+	}
+	
+	torrent = read_torrent_file(argv[1]);
+
+	send_start_msg(torrent);
 	
 	return 0;
 } 
