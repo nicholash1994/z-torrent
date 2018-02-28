@@ -3,16 +3,17 @@
 #include <stdlib.h>
 #include "bencode.h"
 #include "http.h"
+#include "error.h"
 #include <time.h>
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <netdb.h>
 #include <rhash.h>
 
-void send_start_msg(struct bdict* torrent) {
+int send_start_msg(struct bdict* torrent) {
 	char msg[1024];
 	char url_enc_hash[61];
-	char* hostname;
+	char hostname[100];
 	char peer_id[20];
 	struct addrinfo hints, *res;
 	struct bdict* dict;
@@ -27,7 +28,15 @@ void send_start_msg(struct bdict* torrent) {
 			break;
 		dict = dict->next;
 	}
-	hostname = (char*)malloc(strlen(dict->val.val)+1);
+	if (dict == NULL) {
+		err("Error: announce url not found!\n");
+		return -ZT_NOFILE;
+	}
+	if (strlen(dict->val.val) >= 99) {
+		err("Error: url is too large!\n");
+		return -ZT_KEYNF;
+	}
+		
 	strcpy(hostname, dict->val.val);
 	get_hostname_from_url(hostname);
 	
