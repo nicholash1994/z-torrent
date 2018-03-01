@@ -12,7 +12,7 @@
 #include <rhash.h>
 
 char* zt_user_agent = "ZTorrent 0.0.1";
-char* port_regex_str = "com:\\([0-9]+\\)";
+char* port_regex_str = "//(?<=com://)[0-9]*";
 char* hostname_regex_str = "http:\\\\([\\w\\d-]+)/{0,1}";
 
 int send_start_msg(struct bdict* torrent) {
@@ -25,6 +25,7 @@ int send_start_msg(struct bdict* torrent) {
 	int i, trackerfd;
 	regex_t hostname_regex, port_regex;
 	regmatch_t results[20];
+	char regex_error_buf[100];
 
 	i = 0;
 
@@ -44,13 +45,16 @@ int send_start_msg(struct bdict* torrent) {
 		return -ZT_KEYNF;
 	}
 		
+	memset(results, 0, 20*sizeof(regmatch_t));
 	// getting the hostname with a regular expression
 	regcomp(&hostname_regex, hostname_regex_str, 0);
 	regexec(&hostname_regex, dict->val.val, 10, results, 0);
 
 	// getting the port number
-	regcomp(&port_regex, port_regex_str, 0);
-	regexec(&port_regex, dict->val.val, 10, &results[10], 0);
+	i=regcomp(&port_regex, port_regex_str, 0);
+	i=regexec(&port_regex, dict->val.val, 10, &results[10], 0);
+	regerror(i, &port_regex, regex_error_buf, 100);
+	printf("Error: %s\n", regex_error_buf);
 
 	strcpy(hostname, dict->val.val);
 	get_hostname_from_url(hostname);
