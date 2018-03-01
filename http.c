@@ -12,24 +12,23 @@
 #include <rhash.h>
 
 char* zt_user_agent = "ZTorrent 0.0.1";
-char* port_regex_str = "//(?<=com://)[0-9]*";
-char* hostname_regex_str = "http:\\\\([\\w\\d-]+)/{0,1}";
+char* url_regex_str = "http://(.*)(:[0-9]+)?(/.*)$";
 
 int send_start_msg(struct bdict* torrent) {
 	char msg[1024];
 	char url_enc_hash[61];
 	char hostname[100];
+	char url_resource[100];
 	char peer_id[20];
 	struct addrinfo hints, *res;
 	struct bdict* dict;
-	int i, trackerfd;
-	regex_t hostname_regex, port_regex;
+	int i, j, trackerfd;
+	regex_t url_regex;
 	regmatch_t results[20];
 	char regex_error_buf[100];
 
 	i = 0;
 
-	// getting the hostname
 	dict = torrent->val.dict;
 	while (dict != NULL) {
 		if (dict->vtype == USTRING && strcmp(dict->key, "announce") == 0)
@@ -47,14 +46,12 @@ int send_start_msg(struct bdict* torrent) {
 		
 	memset(results, 0, 20*sizeof(regmatch_t));
 	// getting the hostname with a regular expression
-	regcomp(&hostname_regex, hostname_regex_str, 0);
-	regexec(&hostname_regex, dict->val.val, 10, results, 0);
-
-	// getting the port number
-	i=regcomp(&port_regex, port_regex_str, 0);
-	i=regexec(&port_regex, dict->val.val, 10, &results[10], 0);
-	regerror(i, &port_regex, regex_error_buf, 100);
-	printf("Error: %s\n", regex_error_buf);
+	i=regcomp(&url_regex, url_regex_str, REG_EXTENDED);
+	j=regexec(&url_regex, dict->val.val, 20, results, 0);
+	regerror(i, &url_regex, regex_error_buf, 100);
+	printf("%s\n", regex_error_buf);
+	regerror(j, &url_regex, regex_error_buf, 100);
+	printf("%s\n", regex_error_buf);
 
 	strcpy(hostname, dict->val.val);
 	get_hostname_from_url(hostname);
