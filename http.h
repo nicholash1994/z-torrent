@@ -3,8 +3,6 @@
 
 #include "bencode.h"
 
-// char* zt_user_agent = "ztorrent (still in development)";
-
 int send_start_msg(struct bdict* torrent);
 void url_encode(char* string, char* url_string);
 int is_char_urlvalid(char c);

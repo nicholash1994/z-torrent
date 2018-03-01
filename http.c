@@ -7,8 +7,13 @@
 #include <time.h>
 #include <sys/socket.h>
 #include <sys/types.h>
+#include <regex.h>
 #include <netdb.h>
 #include <rhash.h>
+
+char* zt_user_agent = "ZTorrent 0.0.1";
+char* port_regex_str = "com:\\([0-9]+\\)";
+char* hostname_regex_str = "http:\\\\([\\w\\d-]+)/{0,1}";
 
 int send_start_msg(struct bdict* torrent) {
 	char msg[1024];
@@ -17,7 +22,9 @@ int send_start_msg(struct bdict* torrent) {
 	char peer_id[20];
 	struct addrinfo hints, *res;
 	struct bdict* dict;
-	int i;
+	int i, trackerfd;
+	regex_t hostname_regex, port_regex;
+	regmatch_t results[20];
 
 	i = 0;
 
@@ -37,6 +44,14 @@ int send_start_msg(struct bdict* torrent) {
 		return -ZT_KEYNF;
 	}
 		
+	// getting the hostname with a regular expression
+	regcomp(&hostname_regex, hostname_regex_str, 0);
+	regexec(&hostname_regex, dict->val.val, 10, results, 0);
+
+	// getting the port number
+	regcomp(&port_regex, port_regex_str, 0);
+	regexec(&port_regex, dict->val.val, 10, &results[10], 0);
+
 	strcpy(hostname, dict->val.val);
 	get_hostname_from_url(hostname);
 	
@@ -48,11 +63,23 @@ int send_start_msg(struct bdict* torrent) {
 	for (i = 0; i < 20; i++)
 		peer_id[i] = rand()%0x100;
 	
+	// getting address info
 	memset(&hints, 0, sizeof(struct addrinfo));
 	hints.ai_family = AF_INET;
 	hints.ai_socktype = SOCK_STREAM;
 
-	getaddrinfo(hostname, "http", &hints, &res);
+	if ((i=getaddrinfo(hostname, "http", &hints, &res)) != 0) {
+		err("Error: %s\n", gai_strerror(i));
+		return -ZT_CONN;
+	}
+
+	if ((trackerfd = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
+		err("Error: couldn't connect to tracker!\n");
+		return -ZT_CONN;
+	}
+
+	connect(trackerfd, res->ai_addr, res->ai_addrlen);
+	//strcpy(msg, "GET 	
 
 }
 

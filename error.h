@@ -4,7 +4,7 @@
 #ifndef _ZT_ERROR_H
 #define _ZT_ERROR_H
 
-#define err(msg) fprintf(stderr, msg)
+#define err(...) fprintf(stderr, __VA_ARGS__)
 
 // used if a file can't be loaded
 #define ZT_NOFILE 1
@@ -18,7 +18,8 @@
 // (or any dictionary)
 #define ZT_KEYNF 3
 
-
+// used for connection errors
+#define ZT_CONN 4
 
 
 #endif
