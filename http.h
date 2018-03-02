@@ -7,7 +7,9 @@ int send_start_msg(struct bdict* torrent);
 void url_encode(char* string, char* url_string);
 int is_char_urlvalid(char c);
 void get_url_enc_info_hash(struct bdict* torrent, char* dst);
-void get_hostname_from_url(char* url);
+int craft_get_request(char* msg, const char* url_resource, 
+				const char* url_enc_hash, const char* url_peer_id, 
+				const char* service, const char* hostname);
 
 
 

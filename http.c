@@ -12,23 +12,27 @@
 #include <rhash.h>
 
 char* zt_user_agent = "ZTorrent 0.0.1";
-char* url_regex_str = "http://(.*)(:[0-9]+)?(/.*)$";
+char* url_regex_str = "https?://([^:/]*):?([0-9]+)?(/.*)$";
 
 int send_start_msg(struct bdict* torrent) {
 	char msg[1024];
+	char buf[1024];
 	char url_enc_hash[61];
 	char hostname[100];
 	char url_resource[100];
+	char service[10];
 	char peer_id[20];
+	char url_peer_id[61];
 	struct addrinfo hints, *res;
 	struct bdict* dict;
 	int i, j, trackerfd;
-	regex_t url_regex;
+	regex_t url_regex, regex1;
 	regmatch_t results[20];
 	char regex_error_buf[100];
 
 	i = 0;
 
+	// finding the announce url in the benecoded dictionary
 	dict = torrent->val.dict;
 	while (dict != NULL) {
 		if (dict->vtype == USTRING && strcmp(dict->key, "announce") == 0)
@@ -43,26 +47,42 @@ int send_start_msg(struct bdict* torrent) {
 		err("Error: url is too large!\n");
 		return -ZT_KEYNF;
 	}
+	
+	get_url_enc_info_hash(torrent, url_enc_hash);
 		
 	memset(results, 0, 20*sizeof(regmatch_t));
-	// getting the hostname with a regular expression
-	i=regcomp(&url_regex, url_regex_str, REG_EXTENDED);
-	j=regexec(&url_regex, dict->val.val, 20, results, 0);
-	regerror(i, &url_regex, regex_error_buf, 100);
-	printf("%s\n", regex_error_buf);
-	regerror(j, &url_regex, regex_error_buf, 100);
-	printf("%s\n", regex_error_buf);
+	// getting the hostname, url, and the resource
+	//  with a regular expression
+	regcomp(&url_regex, url_regex_str, REG_EXTENDED);
+	regexec(&url_regex, dict->val.val, 20, results, 0);
 
-	strcpy(hostname, dict->val.val);
-	get_hostname_from_url(hostname);
-	
-	// getting the info hash
-	get_url_enc_info_hash(torrent, url_enc_hash);
+	strncpy(hostname, &dict->val.val[results[1].rm_so], 
+					results[1].rm_eo - results[1].rm_so);
+	hostname[results[1].rm_eo - results[1].rm_so] = '\0';
+
+	// i.e. if the url didn't specify a port number
+	if (results[3].rm_so == -1) {
+		strcpy(service, "80");
+		strncpy(url_resource, &dict->val.val[results[2].rm_so],
+					results[2].rm_eo - results[2].rm_so);
+		url_resource[results[2].rm_eo - results[2].rm_so] = '\0';
+	}
+	// i.e. if a port number was specified
+	else {
+		strncpy(service, &dict->val.val[results[2].rm_so],	
+					results[2].rm_eo - results[2].rm_so);
+		service[results[2].rm_eo - results[2].rm_so] = '\0';
+		
+		strncpy(url_resource, &dict->val.val[results[3].rm_so],
+					results[3].rm_eo - results[3].rm_so);
+		url_resource[results[3].rm_eo - results[3].rm_so] = '\0';
+	}
 
 	// generating the peer id
 	srand(time(NULL));
 	for (i = 0; i < 20; i++)
 		peer_id[i] = rand()%0x100;
+	url_encode(peer_id, url_peer_id);
 	
 	// getting address info
 	memset(&hints, 0, sizeof(struct addrinfo));
@@ -74,29 +94,80 @@ int send_start_msg(struct bdict* torrent) {
 		return -ZT_CONN;
 	}
 
+	// creating the socket
 	if ((trackerfd = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
 		err("Error: couldn't connect to tracker!\n");
 		return -ZT_CONN;
 	}
 
-	connect(trackerfd, res->ai_addr, res->ai_addrlen);
-	//strcpy(msg, "GET 	
+	// connecting to the server
+	if (connect(trackerfd, res->ai_addr, res->ai_addrlen) == -1) {
+		err("Error: failed to connect to the server!\n");
+		return -ZT_CONN;
+	}
+	
+	// crafting the HTTP GET request
+	// strncpy is used to avoid unnecessarily copying the null byte
 
-}
+	// the expression (-i)+(i+=x) increments i by x and evaluates
+	// to (or returns) x
+	i = 0;
 
-void get_hostname_from_url(char* url) {
-	int i; // index into url
-	int j;
+	craft_get_request(msg, url_resource, url_enc_hash, url_peer_id,
+			service, hostname);
+	
+	printf("%s\n\n", msg);
 
-	for (i = 7; i < strlen(url); i++)
-		if (url[i] == '/' || url[i] == ':') {
-			url[i-7] = '\0';
-			break;
+	// sending the message
+	if (send(trackerfd, msg, 1024, 0) == -1) {
+		err("Error: failed to send initial message to tracker!\n");
+		freeaddrinfo(res);
+		return -ZT_CONN;
+	}
+
+	// this regex is for in case a 301 response (redirect response) is
+	// received
+	regcomp(&regex1, "Location: https?://([^/:]+):?([0-9]+)?(/.*)$",
+				REG_EXTENDED);
+
+	while ((i=recv(trackerfd, buf, 1024, 0)) != EOF && i != -1) {
+		if (strncmp(msg, "HTTP/1.1 301", 12) == 0) {
+			regexec(&regex1, msg, 20, results, 0);
+			
 		}
-		else
-			url[i-7] = url[i];
+		if (i != 0)
+			fwrite(buf, 1, i, stdout);
+	}
+
 }
 
+// returns the length of msg
+int craft_get_request(char* msg, const char* url_resource, 
+				const char* url_enc_hash, const char* url_peer_id, 
+				const char* service, const char* hostname) {
+	int i, j;
+
+	i = 0;
+	strncpy(&msg[i], "GET ", 4);i+=4;
+	strncpy(&msg[i], url_resource, j=strlen(url_resource));i+=j;
+	strncpy(&msg[i], "?info_hash=", 11);i+=11;
+	strncpy(&msg[i], url_enc_hash, j=strlen(url_enc_hash));i+=j;
+	strncpy(&msg[i], "&peer_id=", 9);i+=9;
+	strncpy(&msg[i], url_peer_id, j=strlen(url_peer_id));i+=j;
+	strncpy(&msg[i], "&port=", 6);i+=6;
+	strncpy(&msg[i], service, j=strlen(service));i+=j;
+	strncpy(&msg[i], "&uploaded=0", 11);i+=11;
+	strncpy(&msg[i], "&downloaded=0", 13);i+=13;
+	strncpy(&msg[i], "&left=1502576640", 16);i+=16;
+	strncpy(&msg[i], "&event=started", 14);i+=14;
+	strncpy(&msg[i], " HTTP/1.1\r\nHost: ", 17);i+=17;
+	strncpy(&msg[i], hostname, j=strlen(hostname));i+=j;
+	strncpy(&msg[i], "\r\n\r\n", 4);i+=4;
+	msg[i] = '\0';
+	
+	return i;
+
+}
 // dst must be at least 61 bytes
 void get_url_enc_info_hash(struct bdict* torrent, char* dst) {
 	FILE* info_file;
@@ -118,6 +189,7 @@ void get_url_enc_info_hash(struct bdict* torrent, char* dst) {
 
 // url_string needs to be 3 times as large as string with one 
 // extra byte for the null character
+// the first argument must be null-terminated
 void url_encode(char* string, char* url_string) {
 	int len;
 	int i, j, k;
@@ -130,9 +202,9 @@ void url_encode(char* string, char* url_string) {
 		else { 
 			url_string[j++] = '%';
 			url_string[j++] = 
-				(k=(string[i]&0xF0)>>4) < 10 ? k+'0' : (k-10)+'A'; 
+				(k=(string[i]&0xF0)>>4) < 10 ? k+'0' : (k-10)+'a'; 
 			url_string[j++] =
-				(k=string[i++]&0x0F) < 10 ? k+'0' : (k-10)+'A';
+				(k=string[i++]&0x0F) < 10 ? k+'0' : (k-10)+'a';
 		}
 	url_string[j] = '\0';
 	
