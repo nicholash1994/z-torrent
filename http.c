@@ -12,7 +12,21 @@
 #include <rhash.h>
 
 char* zt_user_agent = "ZTorrent 0.0.1";
-char* url_regex_str = "https?://([^:/]*):?([0-9]+)?(/.*)$";
+char* url_regex_str = "https?://([^:/]*):?([0-9]+)?(/[^ ]*)";
+
+struct http_conn {
+	FILE* socket;
+	char* hostname;
+	char* resource;
+	int port;
+};
+
+struct torrent {
+	struct http_conn conn;
+	struct bdict* root_dict;
+	char url_info_hash[61];
+	char url_peer_id[61];
+};
 
 int send_start_msg(struct bdict* torrent) {
 	char msg[1024];
@@ -141,6 +155,14 @@ int send_start_msg(struct bdict* torrent) {
 
 }
 
+// all strings and arrays must be null-terminated
+int craft_get_request(FILE* socket, const char* url_resource, 
+			const char** keys, const char** headers) {
+
+	strncpy(msg, url_resource
+}
+
+/*
 // returns the length of msg
 int craft_get_request(char* msg, const char* url_resource, 
 				const char* url_enc_hash, const char* url_peer_id, 
@@ -168,6 +190,8 @@ int craft_get_request(char* msg, const char* url_resource,
 	return i;
 
 }
+*/
+
 // dst must be at least 61 bytes
 void get_url_enc_info_hash(struct bdict* torrent, char* dst) {
 	FILE* info_file;
