@@ -14,8 +14,6 @@ CURLM *mhandle;
 int main(int argc, char** argv) {
 	struct bdict *torrent, *info;
 	char* key_path[] = {
-		(char*)~0,
-		(char*)0,
 		"info",
 		(char*)NULL };
 
@@ -32,7 +30,7 @@ int main(int argc, char** argv) {
 	torrent = read_torrent_file(argv[1]);
 	print_bdict(torrent);
 
-	info = find_bdict(torrent, key_path);
+	info = get_bdict(torrent, key_path);
 	print_bdict(info);
 
 	printf("%d\n", destroy_bdict(torrent));

@@ -20,7 +20,6 @@ struct torrent {
 	enum event_stat status;
 };
 
-/*
 struct torrent* start_torrent(const char* filename) {
 	struct torrent *t;
 	struct bdict *dict;
@@ -51,7 +50,8 @@ struct torrent* start_torrent(const char* filename) {
 
 	i = 0;
 	strcpy(get_url, url, j=strlen(url));i+=j;
-	strncpy(
+	url_encode(t->url_info_hash,
+		rhash_
 	
 
 
@@ -59,7 +59,6 @@ struct torrent* start_torrent(const char* filename) {
 
 
 }
-*/
 
 int url_encode(char *dest, const char *src) {
 	int i, j, k, len;
@@ -93,4 +92,12 @@ int is_char_url_valid(char c) {
 		return 0;
 }
 
+char* get_announce_url(struct bdict* root) {
+	return find_bdict(root, "announce");
+}
 
+struct bdict* get_info_bdict(struct bdict* root) {
+	char key_path[] = { "info", NULL };
+
+	return get_bdict(root, key_path);
+}

@@ -242,10 +242,10 @@ void read_int(struct bdict* dict, FILE* file, int* r_depth) {
 }
 
 void print_bdict(struct bdict* dict) {
-	if (dict->key == NULL)
+	//if (dict->key == NULL)
 		print_bdict_h(dict->val.dict, 0);
-	else
-		print_bdict_h(dict, 0);
+	//else
+	//	print_bdict_h(dict, 0);
 }
 	
 void print_bdict_h(struct bdict* dict, int depth) {
@@ -478,15 +478,16 @@ int destroy_bdict(struct bdict* dict) {
 
 // key_path is a list of keys, ending in the key of the desired
 // dictionary. So to get the dictionary with the "name" key in the 
-// "info" dictionary, you'd use the array {~0, "info" , "name", NULL}
+// "info" dictionary, you'd use the array { "info" , "name", NULL }
 // (key paths must be NULL terminated). To get a list member, 
 // two (char*)'s are needed. The first one should be ~0 (0xFFFFFFFF
 // on 32-bit platforms) and the second should be the index into the list,
 // both typecast as (char*)'s.
-struct bdict* find_bdict(struct bdict* root, char** key_path) {
+struct bdict* get_bdict(struct bdict* root, char** key_path) {
 	unsigned long i, n;
 
 	while (*key_path != NULL) {
+		root = root->val.dict;
 		if (*key_path == (char*)~0) {
 			n = (unsigned long)*(++key_path);
 			for (i = 0; i < n; i++)
@@ -501,8 +502,29 @@ struct bdict* find_bdict(struct bdict* root, char** key_path) {
 					break;
 			} while (root = root->next);
 		key_path++;
-		root = root->val.dict;
 	}
 
 	return root;
+}
+
+// strcmp is used in this function so make sure that key_name
+// is null-terminated
+struct bdict* find_bdict(struct bdict* root, const char* key_name) {
+	bdict_stack_t s;
+
+	init_bdict_stack(&s, 256);
+
+	while (root != NULL) {
+		if (root->key != NULL && strcmp(root->key, key_name) == 0)
+			return root;
+		else if (root->vtype == BDICT)
+			push_bdict(&s, root->val.dict)
+		
+		if ((root=root->next) == NULL)
+			root = pop_bdict(&s);
+	}
+	
+	destroy_bdict_stack(&s);
+
+	return NULL;
 }
