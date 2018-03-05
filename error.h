@@ -4,10 +4,12 @@
 #ifndef _ZT_ERROR_H
 #define _ZT_ERROR_H
 
-#define err(...) fprintf(stderr, __VA_ARGS__)
+#define err(x, ...) { fprintf(stderr, __VA_ARGS__); return x; }
 
-// used if a file can't be loaded
-#define ZT_NOFILE 1
+// used for all errors related to torrent files, e.g.
+// if a torrent file isn't specified or if it's improperly
+// formatted
+#define ZT_FILEERR 1
 
 // used if a torrent file contais data that's
 // too large, or if a user inputs data that's

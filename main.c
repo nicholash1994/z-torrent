@@ -5,20 +5,37 @@
 #include <sys/socket.h>
 #include <netdb.h>
 #include "bencode.h"
-#include "http.h"
+#include "error.h"
 #include <rhash.h>
+#include <curl/curl.h>
+
+CURLM *mhandle;
 
 int main(int argc, char** argv) {
-	struct bdict *torrent;
+	struct bdict *torrent, *info;
+	char* key_path[] = {
+		(char*)~0,
+		(char*)0,
+		"info",
+		(char*)NULL };
+
+	if (curl_global_init(CURL_GLOBAL_ALL) != 0)
+		err(-ZT_CONN, "Error: couldn't initialize libcurl!\n");
+	if ((mhandle = curl_multi_init()) == NULL)
+		err(-ZT_CONN, "Error: couldn't create CURL multi-handle!\n");
 
 	if (argc < 2) {
-		fprintf(stderr, "Error: file not specified");
+		fprintf(stderr, "Error: file not specified\n");
 		return -1;
 	}
 	
 	torrent = read_torrent_file(argv[1]);
+	print_bdict(torrent);
 
-	send_start_msg(torrent);
+	info = find_bdict(torrent, key_path);
+	print_bdict(info);
+
+	printf("%d\n", destroy_bdict(torrent));
 	
 	return 0;
 } 

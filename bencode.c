@@ -2,6 +2,7 @@
 #include <string.h>
 #include <stdio.h>
 #include "bencode.h"
+#include "error.h"
 
 
 // returns NULL if the torrent file
@@ -14,12 +15,11 @@ struct bdict* read_torrent_file(const char* filename) {
 	struct bdict* root_dict;
 
 	torrent = fopen(filename, "rb");
-	if (torrent == NULL) {
-		fprintf(stderr, "Error: torrent file couldn't be read!\n");
-		exit(-1);
-	}
+	if (torrent == NULL)
+		err(NULL, "Error: couldn't open torrent file!\n");
 	
 	root_dict = (struct bdict*)malloc(sizeof(struct bdict));
+	memset(root_dict, 0, sizeof(struct bdict));
 
 	r_depth = 0;
 	// this parses the dictionary
@@ -80,6 +80,7 @@ void read_dict(struct bdict* dict, FILE* file, int* r_depth) {
 	// created dictionary
 	dict->val.dict->parent = dict;
 	dict = dict->val.dict;
+	memset(dict, 0, sizeof(struct bdict));
 	dict->vtype = BDICT;
 
 	// setting the key
@@ -116,6 +117,7 @@ void read_dict(struct bdict* dict, FILE* file, int* r_depth) {
 			dict->next = (struct bdict*)malloc(sizeof(struct bdict));
 			dict->next->parent = dict->parent;
 			dict = dict->next;
+			memset(dict, 0, sizeof(struct bdict));
 			dict->key = read_elem(file);
 		}
 		else
@@ -139,6 +141,7 @@ void read_list(struct bdict* dict, FILE* file, int* r_depth) {
 	dict->val.dict = (struct bdict*)malloc(sizeof(struct bdict));
 	dict->val.dict->parent = dict;
 	dict = dict->val.dict;
+	memset(dict, 0, sizeof(struct bdict));
 
 	// the only difference between a list and a dictionary
 	// (in terms of how they're implemented in this program)
@@ -180,6 +183,7 @@ void read_list(struct bdict* dict, FILE* file, int* r_depth) {
 			dict->next = (struct bdict*)malloc(sizeof(struct bdict));
 			dict->next->parent = dict->parent;
 			dict = dict->next;
+			memset(dict, 0, sizeof(struct bdict));
 			dict->key = NULL;
 		}
 		else
@@ -238,7 +242,10 @@ void read_int(struct bdict* dict, FILE* file, int* r_depth) {
 }
 
 void print_bdict(struct bdict* dict) {
-	print_bdict_h(dict->val.dict, 0);
+	if (dict->key == NULL)
+		print_bdict_h(dict->val.dict, 0);
+	else
+		print_bdict_h(dict, 0);
 }
 	
 void print_bdict_h(struct bdict* dict, int depth) {
@@ -425,4 +432,77 @@ void push_bdict(bdict_stack_t* stack, struct bdict* val) {
 
 struct bdict* pop_bdict(bdict_stack_t* stack) {
 	return stack->stack[--stack->size];
+}
+
+// returns the number of records that were deleted
+int destroy_bdict(struct bdict* dict) {
+	bdict_stack_t s;
+	int count;
+	struct bdict* iter;
+
+	count = 0;
+	init_bdict_stack(&s, 256);
+	
+	while (1) {
+		iter = dict;
+			
+		// iterating through each element in the current dictionary
+		while (iter != NULL) {
+			// if the entry of the record was dynamically 
+			// allocated it must be freed
+			if (iter->vtype == USTRING)
+				free(iter->val.val);
+			else if (iter->vtype == BDICT)
+				// if a dictionary is encountered
+				// in the loop, push it on the stack
+				// so it can be freed later
+				push_bdict(&s, iter->val.dict);
+			// recall that lists are dictionaries with null
+			// keys
+			if (iter->key != NULL)
+				free(iter->key);
+			iter=iter->next;
+			count++;
+		}
+		// if there are any more sub-dictionaries to free
+		// then free them
+		if (s.size == 0)
+			break;
+		dict = pop_bdict(&s);
+	}
+
+	destroy_bdict_stack(&s);
+
+	return count;
+}
+
+// key_path is a list of keys, ending in the key of the desired
+// dictionary. So to get the dictionary with the "name" key in the 
+// "info" dictionary, you'd use the array {~0, "info" , "name", NULL}
+// (key paths must be NULL terminated). To get a list member, 
+// two (char*)'s are needed. The first one should be ~0 (0xFFFFFFFF
+// on 32-bit platforms) and the second should be the index into the list,
+// both typecast as (char*)'s.
+struct bdict* find_bdict(struct bdict* root, char** key_path) {
+	unsigned long i, n;
+
+	while (*key_path != NULL) {
+		if (*key_path == (char*)~0) {
+			n = (unsigned long)*(++key_path);
+			for (i = 0; i < n; i++)
+				if ((root=root->next) == NULL)
+					return NULL;
+		}
+		else
+			do {
+				if (root == NULL)
+					return NULL;
+				else if (strcmp(*key_path, root->key) == 0)
+					break;
+			} while (root = root->next);
+		key_path++;
+		root = root->val.dict;
+	}
+
+	return root;
 }
