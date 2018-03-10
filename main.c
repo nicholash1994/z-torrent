@@ -5,6 +5,7 @@
 #include <sys/socket.h>
 #include <netdb.h>
 #include "bencode.h"
+#include "torrent.h" 
 #include "error.h"
 #include <rhash.h>
 #include <curl/curl.h>
@@ -12,11 +13,8 @@
 CURLM *mhandle;
 
 int main(int argc, char** argv) {
-	struct bdict *torrent, *info;
-	char* key_path[] = {
-		"info",
-		(char*)NULL };
-
+	struct torrent *torrent;
+	
 	if (curl_global_init(CURL_GLOBAL_ALL) != 0)
 		err(-ZT_CONN, "Error: couldn't initialize libcurl!\n");
 	if ((mhandle = curl_multi_init()) == NULL)
@@ -27,14 +25,9 @@ int main(int argc, char** argv) {
 		return -1;
 	}
 	
-	torrent = read_torrent_file(argv[1]);
-	print_bdict(torrent);
+	torrent = start_torrent(argv[1]);
+	print_bdict(torrent->root_dict);
 
-	info = get_bdict(torrent, key_path);
-	print_bdict(info);
-
-	printf("%d\n", destroy_bdict(torrent));
-	
 	return 0;
 } 
 

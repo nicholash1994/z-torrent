@@ -8,8 +8,7 @@
 	using a hash table would make the program faster, it would probably be 
 	only be a small margin. However, I might be wrong, and I may consider
 	switching to a hash table in the future.
-*/
-
+*/ 
 
 #ifndef _BENCODE_H
 #define _BENCODE_H
@@ -43,23 +42,23 @@ typedef struct bdict_stack {
 	int size, block_size;
 } bdict_stack_t;
 
-void read_dict(struct bdict* dict, FILE* file, int* r_depth);
-void read_list(struct bdict* dict, FILE* file, int* r_depth);
-void read_int(struct bdict* dict, FILE* file, int* r_depth);
+void read_dict(struct bdict* dict, FILE* file);
+void read_list(struct bdict* dict, FILE* file);
+void read_int(struct bdict* dict, FILE* file);
 char* read_elem(FILE* file);
 struct bdict* read_torrent_file(const char* filename);
-void parser_ctrl(struct bdict* curr, FILE* torrent, int* r_depth);
+void parser_ctrl(struct bdict* curr, FILE* torrent);
 void print_bdict(struct bdict* dict);
 void print_bdict_h(struct bdict* dict, int depth);
 void print_record(struct bdict* dict);
-char* get_announce_url(struct bdict* dict);
 void encode_bdict(struct bdict* dict, FILE* output);
 void init_bdict_stack(bdict_stack_t* stack, int block_size);
 void destroy_bdict_stack(bdict_stack_t*);
 struct bdict* pop_bdict(bdict_stack_t*);
 void push_bdict(bdict_stack_t*, struct bdict*);
 int destroy_bdict(struct bdict* dict);
-struct bdict* find_bdict(struct bdict* root, char** key_path);
+struct bdict* find_bdict(struct bdict* root, const char* key_path);
+struct bdict* get_bdict(struct bdict* root, char** key_path);
 
 
 #endif

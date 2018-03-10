@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include "bencode.h"
 #include "error.h"
+#include "macros.h"
 
 
 // returns NULL if the torrent file
@@ -11,19 +12,17 @@ struct bdict* read_torrent_file(const char* filename) {
 	FILE* torrent;
 	char uc;
 	char key_name[30];
-	int r_depth;
 	struct bdict* root_dict;
 
 	torrent = fopen(filename, "rb");
 	if (torrent == NULL)
 		err(NULL, "Error: couldn't open torrent file!\n");
 	
-	root_dict = (struct bdict*)malloc(sizeof(struct bdict));
-	memset(root_dict, 0, sizeof(struct bdict));
+	MALLOC(root_dict, struct bdict, 1);
+	CLEAR(root_dict, struct bdict, 1);
 
-	r_depth = 0;
 	// this parses the dictionary
-	parser_ctrl(root_dict, torrent, &r_depth);
+	parser_ctrl(root_dict, torrent);
 
 	fclose(torrent);
 
@@ -33,27 +32,21 @@ struct bdict* read_torrent_file(const char* filename) {
 
 // when a special character is encountered, (e.g. 'd', 'e', 'l')
 // this function decides what to do next
-void parser_ctrl(struct bdict* curr, FILE* torrent, int* r_depth) {
+void parser_ctrl(struct bdict* curr, FILE* torrent) {
 	char uc;
 
 	switch (uc=fgetc(torrent)) {
 		case 'd':
-			(*r_depth)++;
 			curr->vtype = BDICT;
-			read_dict(curr, torrent, r_depth);
+			read_dict(curr, torrent);
 			break;
 		case 'l':
-			(*r_depth)++;
 			curr->vtype = BDICT;
-			read_list(curr, torrent, r_depth);
+			read_list(curr, torrent);
 			break;
 		case 'i':
-			(*r_depth)++;
 			curr->vtype = BINT;
-			read_int(curr, torrent, r_depth);
-			break;
-		case 'e':
-			(*r_depth)--;
+			read_int(curr, torrent);
 			break;
 		default:
 			return;
@@ -63,18 +56,12 @@ void parser_ctrl(struct bdict* curr, FILE* torrent, int* r_depth) {
 // This function reads a bencoded dictionary. Since entries in bencoded
 // dictionaries can also have dictionaries as their value, this function
 // plays a critical role in parsing torrent files.
-void read_dict(struct bdict* dict, FILE* file, int* r_depth) {
+void read_dict(struct bdict* dict, FILE* file) {
 	char uc;
-	int depth; // the recursion depth of the dictionary
-			   // that this function is parsing
 
-	// storing the recursion depth of the dictionary
-	// that's being read
-	depth = *r_depth;
-	
 	// creating a dictionary as the value of the current dictionary
 	// and then navigating to it
-	dict->val.dict = (struct bdict*)malloc(sizeof(struct bdict));
+	MALLOC(dict->val.dict, struct bdict, 1);
 	// setting the previous dictionary (the one passed as
 	// an argument to this function) as the parent of the newly
 	// created dictionary
@@ -97,15 +84,7 @@ void read_dict(struct bdict* dict, FILE* file, int* r_depth) {
 			dict->val.val = read_elem(file);
 		}
 		else {
-			parser_ctrl(dict, file, r_depth);
-		}
-
-		// if the last character which was read was 'e', then
-		// *r_depth will be less than depth when parser_ctrl
-		// returns, which allows us to exit the loop (and the function)
-		if (depth > *r_depth) {
-			dict->next = NULL;
-			return;
+			parser_ctrl(dict, file);
 		}
 		
 		// if there are more elements in the dictionary that
@@ -114,34 +93,27 @@ void read_dict(struct bdict* dict, FILE* file, int* r_depth) {
 			
 		PEEK_AHEAD(uc, file);
 		if (uc != 'e') {
-			dict->next = (struct bdict*)malloc(sizeof(struct bdict));
+			MALLOC(dict->next, struct bdict, 1);
 			dict->next->parent = dict->parent;
 			dict = dict->next;
-			memset(dict, 0, sizeof(struct bdict));
 			dict->key = read_elem(file);
 		}
-		else
-			parser_ctrl(dict, file, r_depth);
+		else {
+			fseek(file, 1, SEEK_CUR);
+			dict->next = NULL;
+			break;
+		}
 	}
 }
 
-// TODO: rewrite this function. It could be a lot more concise
-// and much less complicated
-void read_list(struct bdict* dict, FILE* file, int* r_depth) {
+void read_list(struct bdict* dict, FILE* file) {
 	char uc;
-	int depth; // the recursion depth of the list
-			   // that this function is parsing
-
-	// storing the recursion depth of the list
-	// that's being read
-	depth = *r_depth;
 	
 	// creating a dictionary as the value of the current dictionary
 	// and then navigating to it
 	dict->val.dict = (struct bdict*)malloc(sizeof(struct bdict));
 	dict->val.dict->parent = dict;
 	dict = dict->val.dict;
-	memset(dict, 0, sizeof(struct bdict));
 
 	// the only difference between a list and a dictionary
 	// (in terms of how they're implemented in this program)
@@ -162,17 +134,7 @@ void read_list(struct bdict* dict, FILE* file, int* r_depth) {
 		else {
 			// parser control will also determine the type of 
 			// record dict is
-			parser_ctrl(dict, file, r_depth);
-		}
-
-		// if the last character which was read was 'e', then
-		// *r_depth will be less than depth once parser_ctrl
-		// returns, which allows us to exit the loop (and the function)
-		if (depth > *r_depth) {
-			dict->next = NULL;
-			// considered putting a break here instead of 
-			// a return
-			return;
+			parser_ctrl(dict, file);
 		}
 
 		// if there are more elements in the dictionary that
@@ -180,14 +142,18 @@ void read_list(struct bdict* dict, FILE* file, int* r_depth) {
 		// next node in the dictionary, and navigates to it
 		PEEK_AHEAD(uc, file);
 		if (uc != 'e') {
+			// creating the next record in the dictionary
+			// and navigating to it
 			dict->next = (struct bdict*)malloc(sizeof(struct bdict));
 			dict->next->parent = dict->parent;
 			dict = dict->next;
-			memset(dict, 0, sizeof(struct bdict));
 			dict->key = NULL;
 		}
-		else
+		else {
+			// setting the next pointer to NULL and exiting the loop
 			dict->next = NULL;
+			break;
+		}
 	}
 }
 
@@ -195,10 +161,6 @@ void read_list(struct bdict* dict, FILE* file, int* r_depth) {
 // strings returned by this function are
 // dynamically allocated and must be manually
 // freed
-//
-// TODO: the "pieces" dictionary entry has a value which
-// is not a regular UTF-8 string. This function needs to 
-// be modified to parse it correctly
 char* read_elem(FILE* file) {
 	int i;
 	char uc;
@@ -225,7 +187,7 @@ char* read_elem(FILE* file) {
 	return elem;
 }
 
-void read_int(struct bdict* dict, FILE* file, int* r_depth) {
+void read_int(struct bdict* dict, FILE* file) {
 	char c;
 	int i;
 	char buffer[100];
@@ -237,15 +199,10 @@ void read_int(struct bdict* dict, FILE* file, int* r_depth) {
 	
 	dict->vtype = BINT;
 	dict->val.b_int = strtol(buffer, NULL, 10);
-
-	(*r_depth)--;
 }
 
 void print_bdict(struct bdict* dict) {
-	//if (dict->key == NULL)
-		print_bdict_h(dict->val.dict, 0);
-	//else
-	//	print_bdict_h(dict, 0);
+	print_bdict_h(dict->val.dict, 0);
 }
 	
 void print_bdict_h(struct bdict* dict, int depth) {
@@ -304,19 +261,6 @@ void print_record(struct bdict* dict) {
 	}
 }
 
-
-char* get_announce_url(struct bdict* dict) {
-	dict = dict->val.dict;
-
-	while (dict != NULL) {
-		if (strncmp(dict->key, "announce", 8) == 0)
-			return dict->val.val;
-		else
-			dict = dict->next;
-	}
-
-	return NULL;
-}
 
 void encode_bdict(struct bdict* dict, FILE* output) {
 	bdict_stack_t stack;
@@ -518,7 +462,7 @@ struct bdict* find_bdict(struct bdict* root, const char* key_name) {
 		if (root->key != NULL && strcmp(root->key, key_name) == 0)
 			return root;
 		else if (root->vtype == BDICT)
-			push_bdict(&s, root->val.dict)
+			push_bdict(&s, root->val.dict);
 		
 		if ((root=root->next) == NULL)
 			root = pop_bdict(&s);
