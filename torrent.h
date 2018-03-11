@@ -2,7 +2,7 @@
 #define _TORRENT_H
 #include <curl/curl.h>
 
-enum event_stat { ZT_STARTED, ZT_COMPLETED, ZT_STOPPED };
+CURLM *mhandle;
 
 typedef struct bt_peer {
 	int sockfd;
@@ -21,7 +21,7 @@ typedef struct torrent {
 	unsigned int left;
 	char state;
 	bt_peer_t peers[51];
-	enum event_stat status;
+	char *status;
 } torrent_t;
 
 int is_char_url_valid(char c);
@@ -29,6 +29,8 @@ char* get_announce_url(struct bdict* root);
 struct torrent* start_torrent(const char* filename);
 int url_encode(char *dest, const char *src, size_t n);
 struct bdict* get_info_bdict(struct bdict* root);
+size_t write_tracker_response(char *ptr, size_t size,
+				size_t nitems, void *userdata);
 
 
 #endif

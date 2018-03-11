@@ -17,9 +17,7 @@ struct torrent* start_torrent(const char* filename) {
 	char *url;
 	char hash[20];
 	char peer_id[20];
-	char *get_url;
 	int i, j;
-	pthread_t listen;
 
 	MALLOC(t, struct torrent, 1);
 
@@ -27,10 +25,7 @@ struct torrent* start_torrent(const char* filename) {
 	if ((t->root_dict = read_torrent_file(filename)) == NULL)
 		err(NULL, "Error: torrent file couldn't be parsed!\n");
 
-	// initializing CURL handle
-	if ((t->handle = curl_easy_init()) == NULL)
-		err(NULL, "Error: curl handle couldn't be created!\n");
-
+	
 	// getting the announce url
 	t->announce = get_announce_url(t->root_dict);
 
@@ -48,7 +43,24 @@ struct torrent* start_torrent(const char* filename) {
 	url_encode(t->url_peer_id, peer_id, 20);
 
 	// setting the event to started
-	t->status = ZT_STARTED;
+	t->status = "started";
+
+	// initializing and configuring CURL handle
+	if ((t->handle = curl_easy_init()) == NULL)
+		err(NULL, "Error: curl handle couldn't be created!\n");
+	curl_easy_setopt(t->handle, CURLOPT_WRITEFUNCTION, write_tracker_response);
+	curl_easy_setopt(t->handle, CURLOPT_WRITEDATA, NULL);
+	curl_easy_setopt(t->handle, CURLOPT_HTTPGET, 1L);
+	char get_url[strlen(t->announce) + 200];
+	strcpy(get_url, t->announce);
+	strcat(get_url, "?info_hash=");
+	strcat(get_url, t->url_info_hash);
+	strcat(get_url, "&peer_id=");
+	strcat(get_url, t->url_peer_id);
+	curl_easy_setopt(t->handle, CURLOPT_URL, get_url);
+	printf("\n\n%s\n", 
+			curl_easy_strerror(curl_easy_perform(t->handle)));
+
 
 	return t;
 }
@@ -56,10 +68,18 @@ struct torrent* start_torrent(const char* filename) {
 void send_get_msg(struct torrent* t) {
 	char msg[strlen(t->announce)+200];
 	strcpy(msg, t->announce);
-	strcpy(msg, "?info_hash=");
-	strcpy(msg, t->url_info_hash);
-	strcpy(msg, "&peer_id=");
-	strcpy(msg, t->url_peer_id);
+	
+	
+}
+
+/* callback function called by libcurl when the tracker response
+	is received. For now, it simply prints everything to stdout */
+size_t write_tracker_response(char *ptr, size_t size,
+				size_t nitems, void *userdata) {
+	int i;
+
+	for (i = 0; i < size*nitems; i++)
+		putchar(ptr[i]);
 }
 
 // n is the size of src

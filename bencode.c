@@ -151,6 +151,7 @@ void read_list(struct bdict* dict, FILE* file) {
 		}
 		else {
 			// setting the next pointer to NULL and exiting the loop
+			fseek(file, 1, SEEK_CUR);
 			dict->next = NULL;
 			break;
 		}

@@ -10,7 +10,6 @@
 #include <rhash.h>
 #include <curl/curl.h>
 
-CURLM *mhandle;
 
 int main(int argc, char** argv) {
 	struct torrent *torrent;
@@ -26,7 +25,6 @@ int main(int argc, char** argv) {
 	}
 	
 	torrent = start_torrent(argv[1]);
-	print_bdict(torrent->root_dict);
 
 	return 0;
 } 
