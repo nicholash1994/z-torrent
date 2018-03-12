@@ -7,8 +7,7 @@ main.o : main.c bencode.c bencode.h http.c http.h
 bencode.o : bencode.h
 	cc -c -g bencode.c
 
-http.o : http.c http.h bencode.c bencode.h /usr/include/rhash.h
-	cc -c -g http.c
+torrent.o : torrent.h bencode.h bencode.c
 
 clean : 
 	rm ztorrent main.o bencode.o http.o

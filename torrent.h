@@ -1,6 +1,7 @@
 #ifndef _TORRENT_H
 #define _TORRENT_H
 #include <curl/curl.h>
+#include <stdint.h>
 
 CURLM *mhandle;
 
@@ -14,6 +15,7 @@ typedef struct torrent {
 	struct bdict* root_dict;
 	CURL* handle; 
 	char *announce;
+	uint16_t port;
 	char url_info_hash[61];
 	char url_peer_id[61];
 	unsigned int downloaded;

@@ -4,9 +4,11 @@
 #include <stdlib.h>
 #include <curl/curl.h>
 #include <rhash.h>
+#include <unistd.h>
 #include <time.h>
 #include "macros.h"
 #include "torrent.h"
+#include "natpmp.h"
 
 
 struct torrent* start_torrent(const char* filename) {
@@ -32,6 +34,7 @@ struct torrent* start_torrent(const char* filename) {
 	// getting the info hash
 	tmp = fdopen(mkstemp(tmp_name), "wb");
 	encode_bdict(get_info_bdict(t->root_dict), tmp);
+	fflush(tmp);
 	rhash_file(RHASH_SHA1, tmp_name, hash);
 	url_encode(t->url_info_hash, hash, 20);
 	fclose(tmp);
@@ -41,6 +44,9 @@ struct torrent* start_torrent(const char* filename) {
 	for (i = 0; i < 20; i++)
 		peer_id[i] = rand()%0x100;
 	url_encode(t->url_peer_id, peer_id, 20);
+
+	// getting the port with NAT-PMP
+	//t->port = natpmp_request_port(6881);
 
 	// setting the event to started
 	t->status = "started";
@@ -57,6 +63,11 @@ struct torrent* start_torrent(const char* filename) {
 	strcat(get_url, t->url_info_hash);
 	strcat(get_url, "&peer_id=");
 	strcat(get_url, t->url_peer_id);
+	strcatf(get_url, "&port=%d", 6881);
+	strcatf(get_url, "&uploaded=0&downloaded=0&left=%d",
+						find_bdict(t->root_dict, "length")->val.b_int);
+	strcat(get_url, "&event=started");
+	printf("\n%s\n\n", get_url);
 	curl_easy_setopt(t->handle, CURLOPT_URL, get_url);
 	printf("\n\n%s\n", 
 			curl_easy_strerror(curl_easy_perform(t->handle)));
@@ -69,7 +80,6 @@ void send_get_msg(struct torrent* t) {
 	char msg[strlen(t->announce)+200];
 	strcpy(msg, t->announce);
 	
-	
 }
 
 /* callback function called by libcurl when the tracker response
@@ -80,6 +90,8 @@ size_t write_tracker_response(char *ptr, size_t size,
 
 	for (i = 0; i < size*nitems; i++)
 		putchar(ptr[i]);
+
+	return i;
 }
 
 // n is the size of src
@@ -93,9 +105,9 @@ int url_encode(char *dest, const char *src, size_t n) {
 		else {
 			dest[j++] = '%';
 			dest[j++] = 
-				(k=src[i]>>4) < 10 ? k + '0' : k-10+'A';
+				(k=(src[i]&0xF0)>>4) < 10 ? k + '0' : k-10+'a';
 			dest[j++] = 
-				(k=src[i++]&0x0F) < 10 ? k + '0' : k-10+'A';
+				(k=src[i++]&0x0F) < 10 ? k + '0' : k-10+'a';
 		}
 	}
 	dest[j] = '\0';
