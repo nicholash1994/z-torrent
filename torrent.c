@@ -45,8 +45,8 @@ struct torrent* start_torrent(const char* filename) {
 		peer_id[i] = rand()%0x100;
 	url_encode(t->url_peer_id, peer_id, 20);
 
-	// getting the port with NAT-PMP
-	//t->port = natpmp_request_port(6881);
+	// getting the port with libminiupnpc
+	
 
 	// setting the event to started
 	t->status = "started";
@@ -69,8 +69,8 @@ struct torrent* start_torrent(const char* filename) {
 	strcat(get_url, "&event=started");
 	printf("\n%s\n\n", get_url);
 	curl_easy_setopt(t->handle, CURLOPT_URL, get_url);
-	printf("\n\n%s\n", 
-			curl_easy_strerror(curl_easy_perform(t->handle)));
+	//printf("\n\n%s\n", 
+			//curl_easy_strerror(curl_easy_perform(t->handle)));
 
 
 	return t;

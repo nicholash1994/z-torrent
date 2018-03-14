@@ -9,6 +9,7 @@
 #include "error.h"
 #include <rhash.h>
 #include <curl/curl.h>
+#include "ports.h"
 
 
 int main(int argc, char** argv) {
@@ -23,6 +24,8 @@ int main(int argc, char** argv) {
 		fprintf(stderr, "Error: file not specified\n");
 		return -1;
 	}
+
+	init_ports();
 	
 	torrent = start_torrent(argv[1]);
 

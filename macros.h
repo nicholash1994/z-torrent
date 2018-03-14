@@ -12,6 +12,9 @@
 #define CLEAR(p, T, size) memset(p, 0, size*sizeof(T))
 
 #define strcatf(str, format, ...) \
-			sprintf(&str[strlen(str)], format, __VA_ARGS__)
+			sprintf(str+strlen(str), format, __VA_ARGS__)
+
+#define strncatf(str, size, format, ...) \
+			snprintf(str+strlen(str), size, format, __VA_ARGS__)
 
 #endif
