@@ -8,7 +8,6 @@
 #include <time.h>
 #include "macros.h"
 #include "torrent.h"
-#include "natpmp.h"
 
 
 struct torrent* start_torrent(const char* filename) {

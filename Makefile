@@ -1,13 +1,14 @@
-ztorrent : main.o bencode.o http.o
-	cc -o ztorrent main.o bencode.o http.o -lrhash
+ztorrent : main.o bencode.o torrent.o torrent.h
+	cc -o ztorrent torrent.o main.o bencode.o -lrhash -lcurl
 
-main.o : main.c bencode.c bencode.h http.c http.h
-	cc -c -g main.c
+main.o : main.c bencode.c bencode.h
+	cc -c -g main.c -lcurl
 
 bencode.o : bencode.h
-	cc -c -g bencode.c
+	cc -c -g bencode.c -lcurl
 
 torrent.o : torrent.h bencode.h bencode.c
+	cc -c torrent.c -lcurl
 
 clean : 
-	rm ztorrent main.o bencode.o http.o
+	rm ztorrent main.o bencode.o

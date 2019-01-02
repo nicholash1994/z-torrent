@@ -1,6 +1,7 @@
 /*
 	I used an association list to implement the bencoded dictionary data
-	structure because most bencoded dictionaries are small and have less
+	structure because most bencoded dictionaries that are used by torrent programs 
+        are small and have less
 	than 20 records in total. Not only that, but bencoded dictionaries often 
 	have dictionaries as entries, i.e. subdictionaries. So if I used a hash
 	table, for example, I would have to create multiple hash tables whenever
@@ -31,7 +32,7 @@ union bval {
 struct bdict {
 	char* key;
 	union bval val;
-	// indicates whether bval describes a utf-8 string or another bdict
+	/* indicates whether bval describes a utf-8 string or another bdict */
 	int vtype;
 	struct bdict* next;
 	struct bdict* parent;

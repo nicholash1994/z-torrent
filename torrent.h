@@ -43,6 +43,7 @@ typedef struct torrent {
  * For more information about these functions, 
  * check out torrent.c
  */
+struct torrent* start_torrent(const char* filename);
 int is_char_url_valid(char c);
 char* get_announce_url(struct bdict* root);
 struct torrent* start_torrent(const char* filename);

@@ -9,11 +9,11 @@
 #include "error.h"
 #include <rhash.h>
 #include <curl/curl.h>
-#include "ports.h"
-
 
 int main(int argc, char** argv) {
 	struct torrent *torrent;
+	char *torrent_path = NULL;
+	int i;
 	
 	if (curl_global_init(CURL_GLOBAL_ALL) != 0)
 		err(-ZT_CONN, "Error: couldn't initialize libcurl!\n");
@@ -25,9 +25,17 @@ int main(int argc, char** argv) {
 		return -1;
 	}
 
-	init_ports();
-	
-	torrent = start_torrent(argv[1]);
+	/* Processing command-line arguments */
+	for (i = 0; argv[i] != NULL; i++) {
+		if (strcmp(argv[i], "-f") == 0 && argv[i+1] != NULL)
+			torrent_path = argv[i+1];
+	}
+	if (torrent_path == NULL) {
+		fprintf(stderr, "Error: file not specified!\n");
+		return -1;
+	}
+
+	torrent = start_torrent(torrent_path);
 
 	return 0;
 } 

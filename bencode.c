@@ -1,13 +1,17 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
+#include <errno.h>
 #include "bencode.h"
 #include "error.h"
 #include "macros.h"
 
+extern int errno;
 
-// returns NULL if the torrent file
-// is improperly formatted
+/*
+ * returns NULL if the torrent file
+ * is improperly formatted
+ */
 struct bdict* read_torrent_file(const char* filename) {
 	FILE* torrent;
 	char uc;
@@ -21,7 +25,7 @@ struct bdict* read_torrent_file(const char* filename) {
 	MALLOC(root_dict, struct bdict, 1);
 	CLEAR(root_dict, struct bdict, 1);
 
-	// this parses the dictionary
+	/* this parses the dictionary */
 	parser_ctrl(root_dict, torrent);
 
 	fclose(torrent);
@@ -30,8 +34,10 @@ struct bdict* read_torrent_file(const char* filename) {
 
 }
 
-// when a special character is encountered, (e.g. 'd', 'e', 'l')
-// this function decides what to do next
+/*
+ * when a special character is encountered, (e.g. 'd', 'e', 'l')
+ * this function decides what to do next
+ */
 void parser_ctrl(struct bdict* curr, FILE* torrent) {
 	char uc;
 
@@ -53,32 +59,40 @@ void parser_ctrl(struct bdict* curr, FILE* torrent) {
 	}
 }
 
-// This function reads a bencoded dictionary. Since entries in bencoded
-// dictionaries can also have dictionaries as their value, this function
-// plays a critical role in parsing torrent files.
+/*
+ * This function reads a bencoded dictionary. Since entries in bencoded
+ * dictionaries can also have dictionaries as their value, this function
+ * plays a critical role in parsing torrent files.
+ */
 void read_dict(struct bdict* dict, FILE* file) {
 	char uc;
 
-	// creating a dictionary as the value of the current dictionary
-	// and then navigating to it
+	/*
+	 * creating a dictionary as the value of the current dictionary
+	 * and then navigating to it
+	 */
 	MALLOC(dict->val.dict, struct bdict, 1);
-	// setting the previous dictionary (the one passed as
-	// an argument to this function) as the parent of the newly
-	// created dictionary
+	/*
+	 * setting the previous dictionary (the one passed as
+	 * an argument to this function) as the parent of the newly
+	 * created dictionary
+	 */
 	dict->val.dict->parent = dict;
 	dict = dict->val.dict;
 	memset(dict, 0, sizeof(struct bdict));
 	dict->vtype = BDICT;
 
-	// setting the key
+	/* setting the key */
 	dict->key = read_elem(file);
 
 	while (1) {
-		// reading the next character
+		/* reading the next character */
 		PEEK_AHEAD(uc, file);
 		
-		// checking to see whether the value is a UTF-8 string
-		// or another datatype which is to be read by the parser
+		/*
+		 * checking to see whether the value is a UTF-8 string
+		 * or another datatype which is to be read by the parser
+		 */
 		if (uc >= '0' && uc <= '9') {
 			dict->vtype = USTRING;
 			dict->val.val = read_elem(file);
@@ -87,10 +101,11 @@ void read_dict(struct bdict* dict, FILE* file) {
 			parser_ctrl(dict, file);
 		}
 		
-		// if there are more elements in the dictionary that
-		// need to be read, the following code just creates the
-		// next node in the dictionary, and navigates to it
-			
+		/*
+		 * if there are more elements in the dictionary that
+		 * need to be read, the following code just creates the
+		 * next node in the dictionary, and navigates to it
+		 */
 		PEEK_AHEAD(uc, file);
 		if (uc != 'e') {
 			MALLOC(dict->next, struct bdict, 1);
@@ -109,48 +124,60 @@ void read_dict(struct bdict* dict, FILE* file) {
 void read_list(struct bdict* dict, FILE* file) {
 	char uc;
 	
-	// creating a dictionary as the value of the current dictionary
-	// and then navigating to it
+	/*
+	 * creating a dictionary as the value of the current dictionary
+	 * and then navigating to it
+	 */
 	dict->val.dict = (struct bdict*)malloc(sizeof(struct bdict));
 	dict->val.dict->parent = dict;
 	dict = dict->val.dict;
 
-	// the only difference between a list and a dictionary
-	// (in terms of how they're implemented in this program)
-	// is that a list is simply a dictionary with it's entries' keys
-	// set to NULL.
+	/*
+	 * the only difference between a list and a dictionary
+	 * (in terms of how they're implemented in this program)
+	 * is that a list is simply a dictionary with it's entries' keys
+	 * set to NULL.
+	 */
 	dict->key = NULL;
 
 	while (1) {
-		// reading the next character
+		/* reading the next character */
 		PEEK_AHEAD(uc, file);
 
-		// checking to see whether the value is a UTF-8 string
-		// or another datatype which is to be read by the parser
+		/*
+		 * checking to see whether the value is a UTF-8 string
+		 * or another datatype which is to be read by the parser
+		 */
 		if (uc >= '0' && uc <= '9') {
 			dict->vtype = USTRING;
 			(dict->val).val = read_elem(file);
 		}
 		else {
-			// parser control will also determine the type of 
-			// record dict is
+			/*
+			 * parser control will also determine the type of 
+			 * record dict is
+			 */
 			parser_ctrl(dict, file);
 		}
 
-		// if there are more elements in the dictionary that
-		// need to be read, the following code just creates the
-		// next node in the dictionary, and navigates to it
+		/*
+		 * if there are more elements in the dictionary that
+		 * need to be read, the following code just creates the
+		 * next node in the dictionary, and navigates to it
+		 */
 		PEEK_AHEAD(uc, file);
 		if (uc != 'e') {
-			// creating the next record in the dictionary
-			// and navigating to it
+			/*
+			 * creating the next record in the dictionary
+			 * and navigating to it
+			 */
 			dict->next = (struct bdict*)malloc(sizeof(struct bdict));
 			dict->next->parent = dict->parent;
 			dict = dict->next;
 			dict->key = NULL;
 		}
 		else {
-			// setting the next pointer to NULL and exiting the loop
+			/* setting the next pointer to NULL and exiting the loop */
 			fseek(file, 1, SEEK_CUR);
 			dict->next = NULL;
 			break;
@@ -159,9 +186,11 @@ void read_list(struct bdict* dict, FILE* file) {
 }
 
 
-// strings returned by this function are
-// dynamically allocated and must be manually
-// freed
+/*
+ * strings returned by this function are
+ * dynamically allocated and must be manually
+ * freed
+ */
 char* read_elem(FILE* file) {
 	int i;
 	char uc;
@@ -169,15 +198,19 @@ char* read_elem(FILE* file) {
 	char* elem;
 	unsigned long size;
 	
-	// this section of code simply copies the length of the element
-	// into a buffer
+	/*
+	 * this section of code simply copies the length of the element
+	 * into a buffer
+	 */
 	i = 0;
 	while ((uc=fgetc(file)) != ':' && i < 30)
 		size_string[i++] = uc;
 	size_string[i] = '\0';
 
-	// this just converts the size_string to an actual integer
-	// and then allocates a string to store the actual element
+	/*
+	 * this just converts the size_string to an actual integer
+	 * and then allocates a string to store the actual element
+	 */
 	size = strtoul(size_string, NULL, 10);
 	elem = (char*)malloc((1+size)*sizeof(char));
 
@@ -188,18 +221,37 @@ char* read_elem(FILE* file) {
 	return elem;
 }
 
+/*
+ * BEP 3 says that integers in bencoded dictionaries
+ * can be arbitrarily large. However, this program can 
+ * only process integers that can fit into a long value.
+ * If a bencoded dictionary contains an integer that can't
+ * fit into a long value, the program will print an error message 
+ * and exit
+ */
 void read_int(struct bdict* dict, FILE* file) {
 	char c;
 	int i;
-	char buffer[100];
+	/* According to BEP 3, all integers in bencoded
+	 * dictionaries are in decimal and the largest integer
+	 * that can be put in a long variable is
+	 * 4,294,967,295. Thus, 10 characters are needed for the 
+	 * number itself, an additional character for a sign character,
+	 * and one final character for the NULL byte
+	 */
+	char buffer[12];
 
 	i = 0;
-	while ((c=fgetc(file)) != 'e' && i < 99)
+	while ((c=fgetc(file)) != 'e' && i < 12)
 		buffer[i++] = c;
 	buffer[i] = '\0';
 	
 	dict->vtype = BINT;
 	dict->val.b_int = strtol(buffer, NULL, 10);
+	if (errno = ERANGE) {
+		fprintf(stderr, "Error: integer in bencoded dictionary too large!\n");
+		exit(-ERANGE);
+	}
 }
 
 void print_bdict(struct bdict* dict) {
@@ -332,10 +384,12 @@ void encode_bdict(struct bdict* dict, FILE* output) {
 			continue;
 		}
 
-		// if dict doesn't have a record following it, either
-		// navigate to the parent dictionary, or, if there is none,
-		// set dict to dict->next (which would be NULL in this case)
-		// which will cause the loop to finish executing
+		/*
+		 * if dict doesn't have a record following it, either
+		 * navigate to the parent dictionary, or, if there is none,
+		 * set dict to dict->next (which would be NULL in this case)
+		 * which will cause the loop to finish executing
+		 */
 		while (dict->next == NULL) {
 			if (stack.size > 0) {
 				fputc('e', output);
@@ -363,8 +417,10 @@ void destroy_bdict_stack(bdict_stack_t* stack) {
 
 void push_bdict(bdict_stack_t* stack, struct bdict* val) {
 	if (stack->size%stack->block_size == 0)
-		// stack->stack will be NULL if this is the first element
-		// that's being pushed onto the list
+		/*
+		 * stack->stack will be NULL if this is the first element
+		 * that's being pushed onto the list
+		 */
 		if (stack->stack == NULL)
 			stack->stack = 
 				(struct bdict**)malloc(
@@ -379,7 +435,6 @@ struct bdict* pop_bdict(bdict_stack_t* stack) {
 	return stack->stack[--stack->size];
 }
 
-// returns the number of records that were deleted
 int destroy_bdict(struct bdict* dict) {
 	bdict_stack_t s;
 	int count;
@@ -391,26 +446,34 @@ int destroy_bdict(struct bdict* dict) {
 	while (1) {
 		iter = dict;
 			
-		// iterating through each element in the current dictionary
+		/* iterating through each element in the current dictionary */
 		while (iter != NULL) {
-			// if the entry of the record was dynamically 
-			// allocated it must be freed
+			/*
+			 * if the entry of the record was dynamically 
+			 * allocated it must be freed
+			 */
 			if (iter->vtype == USTRING)
 				free(iter->val.val);
 			else if (iter->vtype == BDICT)
-				// if a dictionary is encountered
-				// in the loop, push it on the stack
-				// so it can be freed later
+				/*
+				 * if a dictionary is encountered
+				 * in the loop, push it on the stack
+				 * so it can be freed later
+				 */
 				push_bdict(&s, iter->val.dict);
-			// recall that lists are dictionaries with null
-			// keys
+			/*
+			 * recall that lists are dictionaries with null
+			 * keys
+			 */
 			if (iter->key != NULL)
 				free(iter->key);
 			iter=iter->next;
 			count++;
 		}
-		// if there are any more sub-dictionaries to free
-		// then free them
+		/*
+		 * if there are any more sub-dictionaries to free
+		 * then free them
+		 */
 		if (s.size == 0)
 			break;
 		dict = pop_bdict(&s);
@@ -421,13 +484,15 @@ int destroy_bdict(struct bdict* dict) {
 	return count;
 }
 
-// key_path is a list of keys, ending in the key of the desired
-// dictionary. So to get the dictionary with the "name" key in the 
-// "info" dictionary, you'd use the array { "info" , "name", NULL }
-// (key paths must be NULL terminated). To get a list member, 
-// two (char*)'s are needed. The first one should be ~0 (0xFFFFFFFF
-// on 32-bit platforms) and the second should be the index into the list,
-// both typecast as (char*)'s.
+/*
+ * key_path is a list of keys, ending in the key of the desired
+ * dictionary. So to get the dictionary with the "name" key in the 
+ * "info" dictionary, you'd use the array { "info" , "name", NULL }
+ * (key paths must be NULL terminated). To get a list member, 
+ * two (char*)'s are needed. The first one should be ~0 (0xFFFFFFFF
+ * on 32-bit platforms) and the second should be the index into the list,
+ * both typecast as (char*)'s.
+ */
 struct bdict* get_bdict(struct bdict* root, char** key_path) {
 	unsigned long i, n;
 
