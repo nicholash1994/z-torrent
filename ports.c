@@ -3,23 +3,13 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-// returns 0 on success
-int init_ports() {
-	struct UPNPDev *dev_list, *tmp;
-	struct UPNPUrls *urls;
-	struct IGDdatas *data;
-	
-	dev_list = upnpDiscover(0, NULL,
-             NULL, 0, 0, NULL);
-	
-	if (dev_list == NULL) {
-		fprintf(stderr, "Error: UPnP devices couldn't be found!\n");
-		return -1;
-	}
-	
-	if (UPNP_GetValidIGD(dev_list,
-	
+/*
+ * I'm not implementing UPnP functionality yet
+ * partially because many consider UPnP bad from
+ * a security point of view, so users who want to use
+ * z-torrent will have to manually setup port forwarding
+ * and send z-torrent the port as a command line parameter,
+ * or in a configuration file. If and when I decide to 
+ * implement UPnP, it'll be implemented in this file.
+ */
 
-	return 0;
-
-}

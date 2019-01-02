@@ -94,7 +94,12 @@ size_t write_tracker_response(char *ptr, size_t size,
 	return i;
 }
 
-// n is the size of src
+/* 
+ * This function just encodes a string so that
+ * it can be encoded in a URL.
+ *
+ * n is the size of src 
+ */
 int url_encode(char *dest, const char *src, size_t n) {
 	int i, j, k, len;
 	
