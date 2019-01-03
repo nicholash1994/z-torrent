@@ -24,7 +24,7 @@ enum val_type {USTRING, BDICT, BINT};
 union bval {
 	char* val;
 	struct bdict* dict;
-	int32_t b_int;
+	int64_t b_int;
 };
 
 // can represent either a list (if the key pointer is NULL)
@@ -51,7 +51,7 @@ struct bdict* read_torrent_file(const char* filename);
 void parser_ctrl(struct bdict* curr, FILE* torrent);
 void print_bdict(struct bdict* dict);
 void print_bdict_h(struct bdict* dict, int depth);
-void print_record(struct bdict* dict);
+void print_record(struct bdict* dict, int depth);
 void encode_bdict(struct bdict* dict, FILE* output);
 void init_bdict_stack(bdict_stack_t* stack, int block_size);
 void destroy_bdict_stack(bdict_stack_t*);

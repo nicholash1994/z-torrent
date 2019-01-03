@@ -227,7 +227,9 @@ char* read_elem(FILE* file) {
  * only process integers that can fit into a long value.
  * If a bencoded dictionary contains an integer that can't
  * fit into a long value, the program will print an error message 
- * and exit
+ * and exit. In the future, I may add support for arbitrarily 
+ * large numbers in order to make z-torrent fully BEP 3 
+ * compliant.
  */
 void read_int(struct bdict* dict, FILE* file) {
 	char c;
@@ -242,13 +244,13 @@ void read_int(struct bdict* dict, FILE* file) {
 	char buffer[12];
 
 	i = 0;
-	while ((c=fgetc(file)) != 'e' && i < 12)
+	while ((c=fgetc(file)) != 'e' && i < 11)
 		buffer[i++] = c;
 	buffer[i] = '\0';
 	
 	dict->vtype = BINT;
 	dict->val.b_int = strtol(buffer, NULL, 10);
-	if (errno = ERANGE) {
+	if (errno == ERANGE) {
 		fprintf(stderr, "Error: integer in bencoded dictionary too large!\n");
 		exit(-ERANGE);
 	}
@@ -257,49 +259,31 @@ void read_int(struct bdict* dict, FILE* file) {
 void print_bdict(struct bdict* dict) {
 	print_bdict_h(dict->val.dict, 0);
 }
-	
+
 void print_bdict_h(struct bdict* dict, int depth) {
-	int i;
-	
-	while (dict != NULL) {
-		for (i = 0; i < depth; i++)
-			printf(" ");
 
-		// print key name
-		if (dict->key == NULL)
-			printf("*LIST*: ");
-		else
-			printf("%s: ", dict->key);
+	print_record(dict, depth);
+	if (dict->vtype == BDICT && dict->val.dict != NULL)
+		print_bdict_h(dict->val.dict, depth++);
+	if (dict->next != NULL)
+		print_bdict_h(dict->next, depth);
 
-		// print value
-		switch (dict->vtype) {
-		case BINT:
-			for (i = 0; i < depth; i++)
-				printf(" ");
-			printf("%d\n", dict->val.b_int);
-			break;
-		case USTRING:
-			for (i = 0; i < depth; i++)
-				printf(" ");
-			if (dict->key != NULL && !strncmp(dict->key, "pieces", 6))
-				printf("*binary data*\n");
-			else
-				printf("%s\n", dict->val.val);
-			break;
-		case BDICT:
-			printf("\n");
-			print_bdict_h(dict->val.dict, depth+2);
-			break;
-		}
-		dict=dict->next;
-	}
+	return;
 }
+	
+void print_record(struct bdict* dict, int depth) {
+	int i;
 
-void print_record(struct bdict* dict) {
+	/* Spaces for indentation */
+	for (i = 0; i < 2*depth; i++) fputc(' ', stdout);
+
 	if (dict->key == NULL)
 		printf("Key: NULL\n");
 	else
 		printf("Key: %s\n", dict->key);
+
+	/* Spaces for indentation */
+	for (i = 0; i < 2*depth; i++) fputc(' ', stdout);
 
 	switch (dict->vtype) {
 	case BINT:
@@ -318,8 +302,10 @@ void print_record(struct bdict* dict) {
 void encode_bdict(struct bdict* dict, FILE* output) {
 	bdict_stack_t stack;
 	init_bdict_stack(&stack, 256);
-	// these variables are needed in order to determine
-	// how long the string stored in the "pieces" record is
+	/*
+	 * these variables are needed in order to determine
+	 * how long the string stored in the "pieces" record is
+	 */
 	int len;
 	int piece_len;
 	
@@ -485,6 +471,13 @@ int destroy_bdict(struct bdict* dict) {
 }
 
 /*
+ * Note the difference between get_bdict and find_bdict.
+ * get_bdict takes a path to an element in the bdict dictionary
+ * as a parameter and retrieves the record, whereas find_bdict 
+ * just takes a key name, and searches for it.
+ */
+
+/*
  * key_path is a list of keys, ending in the key of the desired
  * dictionary. So to get the dictionary with the "name" key in the 
  * "info" dictionary, you'd use the array { "info" , "name", NULL }
@@ -517,8 +510,10 @@ struct bdict* get_bdict(struct bdict* root, char** key_path) {
 	return root;
 }
 
-// strcmp is used in this function so make sure that key_name
-// is null-terminated
+/*
+ * strcmp is used in this function so make sure that key_name
+ * is null-terminated
+ */
 struct bdict* find_bdict(struct bdict* root, const char* key_name) {
 	bdict_stack_t s;
 

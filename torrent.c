@@ -22,15 +22,15 @@ struct torrent* start_torrent(const char* filename) {
 
 	MALLOC(t, struct torrent, 1);
 
-	// getting the root dictionary
+	/* getting the root dictionary */
 	if ((t->root_dict = read_torrent_file(filename)) == NULL)
 		err(NULL, "Error: torrent file couldn't be parsed!\n");
 
 	
-	// getting the announce url
+	/* getting the announce url */
 	t->announce = get_announce_url(t->root_dict);
 
-	// getting the info hash
+	/* getting the info hash */
 	tmp = fdopen(mkstemp(tmp_name), "wb");
 	encode_bdict(get_info_bdict(t->root_dict), tmp);
 	fflush(tmp);
@@ -38,19 +38,19 @@ struct torrent* start_torrent(const char* filename) {
 	url_encode(t->url_info_hash, hash, 20);
 	fclose(tmp);
 
-	// generating the peer id
+	/* generating the peer id */
 	srand(time(NULL));
 	for (i = 0; i < 20; i++)
 		peer_id[i] = rand()%0x100;
 	url_encode(t->url_peer_id, peer_id, 20);
 
-	// getting the port with libminiupnpc
+	/* getting the port with libminiupnpc */
 	
 
-	// setting the event to started
+	/* setting the event to started */
 	t->status = "started";
 
-	// initializing and configuring CURL handle
+	/* initializing and configuring CURL handle */
 	if ((t->handle = curl_easy_init()) == NULL)
 		err(NULL, "Error: curl handle couldn't be created!\n");
 	curl_easy_setopt(t->handle, CURLOPT_WRITEFUNCTION, write_tracker_response);

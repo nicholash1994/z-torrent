@@ -12,6 +12,7 @@
 
 int main(int argc, char** argv) {
 	struct torrent *torrent;
+	struct bdict* dict;
 	char *torrent_path = NULL;
 	int i;
 	
@@ -35,7 +36,11 @@ int main(int argc, char** argv) {
 		return -1;
 	}
 
-	torrent = start_torrent(torrent_path);
+	/* torrent = start_torrent(torrent_path); */
+	dict = read_torrent_file(torrent_path);
+	print_bdict(dict);
+
+	destroy_bdict(dict);
 
 	return 0;
 } 
