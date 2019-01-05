@@ -382,37 +382,6 @@ void encode_bdict_h(struct bdict* dict, FILE* output) {
 	fprintf(output, "e");
 } 
 
-void init_bdict_stack(bdict_stack_t* stack, int block_size) {
-	stack->stack = NULL;
-	stack->block_size = block_size;
-	stack->size = 0;
-}
-
-void destroy_bdict_stack(bdict_stack_t* stack) {
-	if (stack->stack != NULL)
-		free(stack->stack);
-}
-
-void push_bdict(bdict_stack_t* stack, struct bdict* val) {
-	if (stack->size%stack->block_size == 0)
-		/*
-		 * stack->stack will be NULL if this is the first element
-		 * that's being pushed onto the list
-		 */
-		if (stack->stack == NULL)
-			stack->stack = 
-				(struct bdict**)malloc(
-						stack->block_size*sizeof(struct bdict*));
-		else
-			stack->stack = (struct bdict**)realloc(stack->stack,
-				(stack->size+stack->block_size)*sizeof(struct bdict*));
-	stack->stack[stack->size++] = val;
-}
-
-struct bdict* pop_bdict(bdict_stack_t* stack) {
-	return stack->stack[--stack->size];
-}
-
 int destroy_bdict(struct bdict* dict) {
 	int ret = 0;
 
@@ -425,57 +394,6 @@ int destroy_bdict(struct bdict* dict) {
 
 	return ret;
 }
-
-#if 0
-int destroy_bdict(struct bdict* dict) {
-	bdict_stack_t s;
-	int count;
-	struct bdict* iter;
-
-	count = 0;
-	init_bdict_stack(&s, 256);
-	
-	while (1) {
-		iter = dict;
-			
-		/* iterating through each element in the current dictionary */
-		while (iter != NULL) {
-			/*
-			 * if the entry of the record was dynamically 
-			 * allocated it must be freed
-			 */
-			if (iter->vtype == USTRING)
-				free(iter->val.val);
-			else if (iter->vtype == BDICT)
-				/*
-				 * if a dictionary is encountered
-				 * in the loop, push it on the stack
-				 * so it can be freed later
-				 */
-				push_bdict(&s, iter->val.dict);
-			/*
-			 * recall that lists are dictionaries with null
-			 * keys
-			 */
-			if (iter->key != NULL)
-				free(iter->key);
-			iter=iter->next;
-			count++;
-		}
-		/*
-		 * if there are any more sub-dictionaries to free
-		 * then free them
-		 */
-		if (s.size == 0)
-			break;
-		dict = pop_bdict(&s);
-	}
-
-	destroy_bdict_stack(&s);
-
-	return count;
-}
-#endif
 
 /*
  * Note the difference between get_bdict and find_bdict.
@@ -521,22 +439,17 @@ struct bdict* get_bdict(struct bdict* root, char** key_path) {
  * strcmp is used in this function so make sure that key_name
  * is null-terminated
  */
+
 struct bdict* find_bdict(struct bdict* root, const char* key_name) {
-	bdict_stack_t s;
+	struct bdict* ret;
 
-	init_bdict_stack(&s, 256);
-
-	while (root != NULL) {
-		if (root->key != NULL && strcmp(root->key, key_name) == 0)
-			return root;
-		else if (root->vtype == BDICT)
-			push_bdict(&s, root->val.dict);
-		
-		if ((root=root->next) == NULL)
-			root = pop_bdict(&s);
-	}
-	
-	destroy_bdict_stack(&s);
-
-	return NULL;
+	if (root->key != NULL && strcmp(root->key, key_name) == 0)
+		return root;
+	else if (root->next != NULL && (ret=find_bdict(root->next, key_name)) != NULL)
+		return ret;
+	else if (root->vtype == BDICT && root->val.dict != NULL
+			&& (ret=find_bdict(root->val.dict, key_name)) != NULL)
+		return ret;
+	else
+		return NULL;
 }

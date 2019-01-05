@@ -29,8 +29,8 @@ union bval {
 	int64_t b_int;
 };
 
-// can represent either a list (if the key pointer is NULL)
-// or a dictionary (if it's not)
+/* can represent either a list (if the key pointer is NULL)
+ or a dictionary (if it's not) */
 struct bdict {
 	char* key;
 	union bval val;
@@ -39,11 +39,6 @@ struct bdict {
 	struct bdict* next;
 	struct bdict* parent;
 };
-
-typedef struct bdict_stack {
-	struct bdict** stack;
-	int size, block_size;
-} bdict_stack_t;
 
 void read_dict(struct bdict* dict, FILE* file);
 void read_list(struct bdict* dict, FILE* file);
@@ -56,10 +51,6 @@ void print_bdict_h(struct bdict* dict, int depth);
 void print_record(struct bdict* dict, int depth);
 void encode_bdict(struct bdict* dict, FILE* output);
 void encode_bdict_h(struct bdict* dict, FILE* output);
-void init_bdict_stack(bdict_stack_t* stack, int block_size);
-void destroy_bdict_stack(bdict_stack_t*);
-struct bdict* pop_bdict(bdict_stack_t*);
-void push_bdict(bdict_stack_t*, struct bdict*);
 int destroy_bdict(struct bdict* dict);
 struct bdict* find_bdict(struct bdict* root, const char* key_path);
 struct bdict* get_bdict(struct bdict* root, char** key_path);
