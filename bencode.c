@@ -14,8 +14,7 @@ extern int errno;
  */
 struct bdict* read_torrent_file(const char* filename) {
 	FILE* torrent;
-	char uc;
-	char key_name[30];
+	char uc; char key_name[30];
 	struct bdict* root_dict;
 
 	torrent = fopen(filename, "rb");
@@ -72,6 +71,7 @@ void read_dict(struct bdict* dict, FILE* file) {
 	 * and then navigating to it
 	 */
 	MALLOC(dict->val.dict, struct bdict, 1);
+	CLEAR(dict->val.dict, struct bdict, 1);
 	/*
 	 * setting the previous dictionary (the one passed as
 	 * an argument to this function) as the parent of the newly
@@ -79,8 +79,6 @@ void read_dict(struct bdict* dict, FILE* file) {
 	 */
 	dict->val.dict->parent = dict;
 	dict = dict->val.dict;
-	memset(dict, 0, sizeof(struct bdict));
-	dict->vtype = BDICT;
 
 	/* setting the key */
 	dict->key = read_elem(file);
@@ -128,7 +126,9 @@ void read_list(struct bdict* dict, FILE* file) {
 	 * creating a dictionary as the value of the current dictionary
 	 * and then navigating to it
 	 */
-	dict->val.dict = (struct bdict*)malloc(sizeof(struct bdict));
+	MALLOC(dict->val.dict, struct bdict, 1);
+	CLEAR(dict->val.dict, struct bdict, 1);
+
 	dict->val.dict->parent = dict;
 	dict = dict->val.dict;
 
@@ -171,7 +171,8 @@ void read_list(struct bdict* dict, FILE* file) {
 			 * creating the next record in the dictionary
 			 * and navigating to it
 			 */
-			dict->next = (struct bdict*)malloc(sizeof(struct bdict));
+			MALLOC(dict->next, struct bdict, 1);
+			CLEAR(dict->next, struct bdict, 1);
 			dict->next->parent = dict->parent;
 			dict = dict->next;
 			dict->key = NULL;
@@ -264,7 +265,7 @@ void print_bdict_h(struct bdict* dict, int depth) {
 
 	print_record(dict, depth);
 	if (dict->vtype == BDICT && dict->val.dict != NULL)
-		print_bdict_h(dict->val.dict, depth++);
+		print_bdict_h(dict->val.dict, depth+1);
 	if (dict->next != NULL)
 		print_bdict_h(dict->next, depth);
 
@@ -298,97 +299,88 @@ void print_record(struct bdict* dict, int depth) {
 	}
 }
 
-
 void encode_bdict(struct bdict* dict, FILE* output) {
-	bdict_stack_t stack;
-	init_bdict_stack(&stack, 256);
-	/*
-	 * these variables are needed in order to determine
-	 * how long the string stored in the "pieces" record is
-	 */
-	int len;
-	int piece_len;
-	
+	encode_bdict_h(dict->val.dict, output);
+}
+
+void encode_bdict_h(struct bdict* dict, FILE* output) {
+	long len;
+	long piece_len;
 	struct bdict* tmp;
 	
-	dict = dict->val.dict;
-	
-	// getting len and piece_len
-	tmp = dict;
-	while (dict != NULL) {
-		if (strcmp("length", dict->key) == 0)
-			len = dict->val.b_int;
-		else if (strcmp("piece length", dict->key) == 0)
-			piece_len = dict->val.b_int;
-		dict = dict->next;
+	/*
+	 * This if-else statement just checks to see if we're
+	 * iterating over a list or a dictionary, and prints
+	 * and prints "d" if it's a dictionary and "l" if it's
+	 * a regular list
+	 */
+	if (dict->key != NULL) {
+		fprintf(output, "d");
 	}
-	dict = tmp;
-	
-	fprintf(output, "d");
-	
-	while (dict != NULL) {
-		// printing the current record
-		switch (dict->vtype) {
-		case USTRING:
-			if (dict->key != NULL) {
-				fprintf(output, "%lu:", strlen(dict->key));
-				fwrite(dict->key, 1, strlen(dict->key), output);
+	else {
+		fprintf(output, "l");
+	}
 
-			}
-			if (dict->key != NULL && strncmp(dict->key, "pieces", 6) == 0) {
-				fprintf(output, "%d:", ((len/piece_len)+1)*20);
-				fwrite(dict->val.val, 1, ((len/piece_len)+1)*20, output);
-			}
-			else {
-				fprintf(output, "%lu:", strlen(dict->val.val));
-				fwrite(dict->val.val, 1, strlen(dict->val.val), output);
-			}
+	/* Iterating through each element in the dictionary */
+	while (dict != NULL) {
+	
+		/* Printing key if it exists */
+		if (dict->key != NULL)
+			fprintf(output, "%d:%s", strlen(dict->key), dict->key);
+	
+		/* Iterating through the dictionary (or list) */
+		switch(dict->vtype) {
+		case BDICT:
+			/* 
+			 * If a nested dictionary or list is found, 
+			 * make a recursive call to encode_bdict_h
+			 */
+			encode_bdict_h(dict->val.dict, output);
 			break;
 		case BINT:
-			if (dict->key != NULL) {
-				fprintf(output, "%lu:", strlen(dict->key));
-				fwrite(dict->key, 1, strlen(dict->key), output);
-				if (strncmp(dict->key, "length", 6) == 0)
-					len = dict->val.b_int;
-				if (strncmp(dict->key, "piece length", 12) == 0)
-					piece_len = dict->val.b_int;
-			}
-
-			fprintf(output, "i%de", dict->val.b_int);
+			fprintf(output, "i%lde", dict->val.b_int);
 			break;
-		case BDICT:
-			if (dict->key != NULL) {
-				fprintf(output, "%lu:", strlen(dict->key));
-				fwrite(dict->key, 1, strlen(dict->key), output);
-			}	
-			push_bdict(&stack, dict);
-			dict = dict->val.dict;
-			if (dict->key == NULL)
-				fprintf(output, "l");
-			else
-				fprintf(output, "d");
-			continue;
-		}
-
-		/*
-		 * if dict doesn't have a record following it, either
-		 * navigate to the parent dictionary, or, if there is none,
-		 * set dict to dict->next (which would be NULL in this case)
-		 * which will cause the loop to finish executing
-		 */
-		while (dict->next == NULL) {
-			if (stack.size > 0) {
-				fputc('e', output);
-				dict = pop_bdict(&stack);
+		case USTRING:
+			/* 
+			 * Pieces string requires special handling because it's 
+			 * not NULL-terminated 
+			 */
+			if (dict->key != NULL && strcmp(dict->key, "pieces") == 0) {
+				/* Getting the length of the file */
+				if ((tmp=find_bdict(dict->parent, "length")) != NULL) {
+					len = tmp->val.b_int;
+				}
+				else {
+					fprintf(stderr, "Error: couldn't find length of torrent file!\n");
+					exit(-1);
+				}
+				/* Getting the piece length */
+				if ((tmp=find_bdict(dict->parent, "piece length")) != NULL) {
+					piece_len = tmp->val.b_int;
+				}
+				else {
+					fprintf(stderr, "Error: couldn't find piece length!\n");
+					exit(-1);
+				}
+				fprintf(output, "%d:", INTCEIL(len, piece_len)*20);
+				fwrite(dict->val.val, 1, INTCEIL(len, piece_len)*20, output);
 			}
 			else {
-				fprintf(output, "e");
-				break;
+				fprintf(output, "%d:%s", strlen(dict->val.val), dict->val.val);
 			}
+			break;
 		}
+	
+		/* Advance to next element in dictionary/list */
 		dict = dict->next;
 	}
-}
+
+	/* 
+	 * Print "e" when we're done iterating through all
+	 * the elements 
+     */
+	fprintf(output, "e");
+} 
 
 void init_bdict_stack(bdict_stack_t* stack, int block_size) {
 	stack->stack = NULL;
@@ -421,6 +413,20 @@ struct bdict* pop_bdict(bdict_stack_t* stack) {
 	return stack->stack[--stack->size];
 }
 
+int destroy_bdict(struct bdict* dict) {
+	int ret = 0;
+
+	if (dict->next != NULL)
+		ret += destroy_bdict(dict->next);
+	if (dict->vtype == BDICT && dict->val.dict != NULL)
+		ret += destroy_bdict(dict->val.dict);
+
+	free(dict);
+
+	return ret;
+}
+
+#if 0
 int destroy_bdict(struct bdict* dict) {
 	bdict_stack_t s;
 	int count;
@@ -469,6 +475,7 @@ int destroy_bdict(struct bdict* dict) {
 
 	return count;
 }
+#endif
 
 /*
  * Note the difference between get_bdict and find_bdict.

@@ -19,6 +19,8 @@
 
 #define PEEK_AHEAD(uc, file) {uc=fgetc(file); fseek(file, -1, SEEK_CUR);}
 
+#define INTCEIL(n, d) ((n%d==0 ? n/d : n/d + 1))
+
 enum val_type {USTRING, BDICT, BINT};
 
 union bval {
@@ -53,6 +55,7 @@ void print_bdict(struct bdict* dict);
 void print_bdict_h(struct bdict* dict, int depth);
 void print_record(struct bdict* dict, int depth);
 void encode_bdict(struct bdict* dict, FILE* output);
+void encode_bdict_h(struct bdict* dict, FILE* output);
 void init_bdict_stack(bdict_stack_t* stack, int block_size);
 void destroy_bdict_stack(bdict_stack_t*);
 struct bdict* pop_bdict(bdict_stack_t*);

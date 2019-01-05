@@ -38,8 +38,7 @@ int main(int argc, char** argv) {
 
 	/* torrent = start_torrent(torrent_path); */
 	dict = read_torrent_file(torrent_path);
-	print_bdict(dict);
-
+	encode_bdict(dict, stdout);
 	destroy_bdict(dict);
 
 	return 0;
