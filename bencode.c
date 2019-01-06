@@ -237,15 +237,15 @@ void read_int(struct bdict* dict, FILE* file) {
 	int i;
 	/* According to BEP 3, all integers in bencoded
 	 * dictionaries are in decimal and the largest integer
-	 * that can be put in a long variable is
-	 * 4,294,967,295. Thus, 10 characters are needed for the 
+	 * that can be put in a signed 64-bit variable is
+	 * 9,223,372,036,854,775,807. Thus, 19 characters are needed for the 
 	 * number itself, an additional character for a sign character,
 	 * and one final character for the NULL byte
 	 */
-	char buffer[12];
+	char buffer[21];
 
 	i = 0;
-	while ((c=fgetc(file)) != 'e' && i < 11)
+	while ((c=fgetc(file)) != 'e' && i < 20)
 		buffer[i++] = c;
 	buffer[i] = '\0';
 	
