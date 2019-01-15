@@ -2,10 +2,10 @@
 #include <string.h>
 #include <stdio.h>
 #include <errno.h>
+#include <assert.h>
 #include "bencode.h"
 #include "error.h"
 #include "macros.h"
-
 extern int errno;
 
 /*
@@ -66,6 +66,8 @@ void parser_ctrl(struct bdict* curr, FILE* torrent) {
 void read_dict(struct bdict* dict, FILE* file) {
 	char uc;
 
+	
+
 	/*
 	 * creating a dictionary as the value of the current dictionary
 	 * and then navigating to it
@@ -93,7 +95,7 @@ void read_dict(struct bdict* dict, FILE* file) {
 		 */
 		if (uc >= '0' && uc <= '9') {
 			dict->vtype = USTRING;
-			dict->val.val = read_elem(file);
+			dict->val.b_string = read_elem(file);
 		}
 		else {
 			parser_ctrl(dict, file);
@@ -138,7 +140,7 @@ void read_list(struct bdict* dict, FILE* file) {
 	 * is that a list is simply a dictionary with it's entries' keys
 	 * set to NULL.
 	 */
-	dict->key = NULL;
+	dict->key.val = NULL;
 
 	while (1) {
 		/* reading the next character */
@@ -150,7 +152,7 @@ void read_list(struct bdict* dict, FILE* file) {
 		 */
 		if (uc >= '0' && uc <= '9') {
 			dict->vtype = USTRING;
-			(dict->val).val = read_elem(file);
+			(dict->val).b_string = read_elem(file);
 		}
 		else {
 			/*
@@ -175,7 +177,7 @@ void read_list(struct bdict* dict, FILE* file) {
 			CLEAR(dict->next, struct bdict, 1);
 			dict->next->parent = dict->parent;
 			dict = dict->next;
-			dict->key = NULL;
+			dict->key.val = NULL;
 		}
 		else {
 			/* setting the next pointer to NULL and exiting the loop */
@@ -192,10 +194,11 @@ void read_list(struct bdict* dict, FILE* file) {
  * dynamically allocated and must be manually
  * freed
  */
-char* read_elem(FILE* file) {
+struct b_string read_elem(FILE* file) {
 	int i;
 	char uc;
 	char size_string[30];
+	struct b_string ret;
 	char* elem;
 	unsigned long size;
 	
@@ -212,14 +215,17 @@ char* read_elem(FILE* file) {
 	 * this just converts the size_string to an actual integer
 	 * and then allocates a string to store the actual element
 	 */
+
 	size = strtoul(size_string, NULL, 10);
-	elem = (char*)malloc((1+size)*sizeof(char));
+	assert(errno != ERANGE);
+	ret.len = size;
+	ret.val = (char*)malloc((1+size)*sizeof(char));
 
 	for (i = 0; i < size; i++)
-		elem[i] = fgetc(file);
-	elem[size] = '\0';
+		ret.val[i] = fgetc(file);
+	ret.val[size] = '\0';
 
-	return elem;
+	return ret;
 }
 
 /*
@@ -278,10 +284,10 @@ void print_record(struct bdict* dict, int depth) {
 	/* Spaces for indentation */
 	for (i = 0; i < 2*depth; i++) fputc(' ', stdout);
 
-	if (dict->key == NULL)
+	if (dict->key.val == NULL)
 		printf("Key: NULL\n");
 	else
-		printf("Key: %s\n", dict->key);
+		printf("Key: %s\n", dict->key.val);
 
 	/* Spaces for indentation */
 	for (i = 0; i < 2*depth; i++) fputc(' ', stdout);
@@ -294,7 +300,7 @@ void print_record(struct bdict* dict, int depth) {
 		printf("Value: dictionary/list\n\n");
 		break;
 	case USTRING:
-		printf("Value: %s\n\n", dict->val.val);
+		printf("Value: %s\n\n", dict->val.b_string.val);
 		break;
 	}
 }
@@ -314,7 +320,7 @@ void encode_bdict_h(struct bdict* dict, FILE* output) {
 	 * and prints "d" if it's a dictionary and "l" if it's
 	 * a regular list
 	 */
-	if (dict->key != NULL) {
+	if (dict->key.val != NULL) {
 		fprintf(output, "d");
 	}
 	else {
@@ -325,8 +331,8 @@ void encode_bdict_h(struct bdict* dict, FILE* output) {
 	while (dict != NULL) {
 	
 		/* Printing key if it exists */
-		if (dict->key != NULL)
-			fprintf(output, "%d:%s", strlen(dict->key), dict->key);
+		if (dict->key.val != NULL)
+			fprintf(output, "%d:%s", dict->key.len, dict->key.val);
 	
 		/* Iterating through the dictionary (or list) */
 		switch(dict->vtype) {
@@ -341,33 +347,8 @@ void encode_bdict_h(struct bdict* dict, FILE* output) {
 			fprintf(output, "i%lde", dict->val.b_int);
 			break;
 		case USTRING:
-			/* 
-			 * Pieces string requires special handling because it's 
-			 * not NULL-terminated 
-			 */
-			if (dict->key != NULL && strcmp(dict->key, "pieces") == 0) {
-				/* Getting the length of the file */
-				if ((tmp=find_bdict(dict->parent, "length")) != NULL) {
-					len = tmp->val.b_int;
-				}
-				else {
-					fprintf(stderr, "Error: couldn't find length of torrent file!\n");
-					exit(-1);
-				}
-				/* Getting the piece length */
-				if ((tmp=find_bdict(dict->parent, "piece length")) != NULL) {
-					piece_len = tmp->val.b_int;
-				}
-				else {
-					fprintf(stderr, "Error: couldn't find piece length!\n");
-					exit(-1);
-				}
-				fprintf(output, "%d:", INTCEIL(len, piece_len)*20);
-				fwrite(dict->val.val, 1, INTCEIL(len, piece_len)*20, output);
-			}
-			else {
-				fprintf(output, "%d:%s", strlen(dict->val.val), dict->val.val);
-			}
+			fprintf(output, "%d:", dict->val.b_string.len);
+			fwrite(dict->val.b_string.val, 1, dict->val.b_string.len, output);
 			break;
 		}
 	
@@ -426,7 +407,7 @@ struct bdict* get_bdict(struct bdict* root, char** key_path) {
 			do {
 				if (root == NULL)
 					return NULL;
-				else if (strcmp(*key_path, root->key) == 0)
+				else if (strcmp(*key_path, root->key.val) == 0)
 					break;
 			} while (root = root->next);
 		key_path++;
@@ -443,7 +424,7 @@ struct bdict* get_bdict(struct bdict* root, char** key_path) {
 struct bdict* find_bdict(struct bdict* root, const char* key_name) {
 	struct bdict* ret;
 
-	if (root->key != NULL && strcmp(root->key, key_name) == 0)
+	if (root->key.val != NULL && strcmp(root->key.val, key_name) == 0)
 		return root;
 	else if (root->next != NULL && (ret=find_bdict(root->next, key_name)) != NULL)
 		return ret;

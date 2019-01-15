@@ -128,7 +128,7 @@ int is_char_url_valid(char c) {
 }
 
 char* get_announce_url(struct bdict* root) {
-	return find_bdict(root, "announce")->val.val;
+	return find_bdict(root, "announce")->val.b_string.val;
 }
 
 struct bdict* get_info_bdict(struct bdict* root) {

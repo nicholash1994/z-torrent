@@ -23,8 +23,21 @@
 
 enum val_type {USTRING, BDICT, BINT};
 
+/* 
+ * This struct is needed because strings in 
+ * bencoded dictionaries aren't always NULL-terminated.
+ * For example, the pieces string in pretty much every
+ * torrent metafile is not NULL-terminated (and can't be,
+ * since it's in binary, not plaintext). Thus, we need to
+ * store the length of the string as well
+ */
+struct b_string {
+		char* val;
+		u_int64_t len;
+};
+
 union bval {
-	char* val;
+	struct b_string b_string;
 	struct bdict* dict;
 	int64_t b_int;
 };
@@ -32,7 +45,7 @@ union bval {
 /* can represent either a list (if the key pointer is NULL)
  or a dictionary (if it's not) */
 struct bdict {
-	char* key;
+	struct b_string key;
 	union bval val;
 	/* indicates whether bval describes a utf-8 string or another bdict */
 	int vtype;
@@ -43,7 +56,7 @@ struct bdict {
 void read_dict(struct bdict* dict, FILE* file);
 void read_list(struct bdict* dict, FILE* file);
 void read_int(struct bdict* dict, FILE* file);
-char* read_elem(FILE* file);
+struct b_string read_elem(FILE* file);
 struct bdict* read_torrent_file(const char* filename);
 void parser_ctrl(struct bdict* curr, FILE* torrent);
 void print_bdict(struct bdict* dict);
