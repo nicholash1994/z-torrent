@@ -36,10 +36,12 @@ int main(int argc, char** argv) {
 		return -1;
 	}
 
-	/* torrent = start_torrent(torrent_path); */
+	torrent = start_torrent(torrent_path);
+	/*
 	dict = read_torrent_file(torrent_path);
 	encode_bdict(dict, stdout);
 	destroy_bdict(dict);
+	*/
 
 	return 0;
 } 

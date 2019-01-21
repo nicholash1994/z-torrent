@@ -14,7 +14,7 @@ struct torrent* start_torrent(const char* filename) {
 	FILE* tmp;
 	char tmp_name[] = "/tmp/zt_infoXXXXXX";
 	struct torrent *t;
-	struct bdict *dict;
+	struct bdict *dict, *res_dict;
 	char *url;
 	char hash[20];
 	char peer_id[20];
@@ -51,7 +51,7 @@ struct torrent* start_torrent(const char* filename) {
 	if ((t->handle = curl_easy_init()) == NULL)
 		err(NULL, "Error: curl handle couldn't be created!\n");
 	curl_easy_setopt(t->handle, CURLOPT_WRITEFUNCTION, write_tracker_response);
-	curl_easy_setopt(t->handle, CURLOPT_WRITEDATA, NULL);
+	curl_easy_setopt(t->handle, CURLOPT_WRITEDATA, (void*)&res_dict);
 	curl_easy_setopt(t->handle, CURLOPT_HTTPGET, 1L);
 	char get_url[strlen(t->announce) + 200];
 	strcpy(get_url, t->announce);
@@ -60,7 +60,7 @@ struct torrent* start_torrent(const char* filename) {
 	strcat(get_url, "&peer_id=");
 	strcat(get_url, t->url_peer_id);
 	strcatf(get_url, "&port=%d", 6881);
-	strcatf(get_url, "&uploaded=0&downloaded=0&left=%d",
+	strcatf(get_url, "&uploaded=0&downloaded=0&left=%ld",
 						find_bdict(t->root_dict, "length")->val.b_int);
 	strcat(get_url, "&event=started");
 	printf("\n%s\n\n", get_url);
@@ -68,6 +68,7 @@ struct torrent* start_torrent(const char* filename) {
 	printf("\n\n%s\n", 
 		curl_easy_strerror(curl_easy_perform(t->handle)));
 
+	print_bdict(res_dict);
 
 	return t;
 }
@@ -83,9 +84,21 @@ void send_get_msg(struct torrent* t) {
 size_t write_tracker_response(char *ptr, size_t size,
 				size_t nitems, void *userdata) {
 	int i;
+	FILE* tmp;
+	struct bdict* res_dict;
+	char tmp_name[] = "/tmp/zt_trackerresXXXXXX";
 
+	tmp = fdopen(mkstemp(tmp_name), "wb");
 	for (i = 0; i < size*nitems; i++)
-		putchar(ptr[i]);
+		fputc(ptr[i], tmp);
+	fflush(tmp);
+	freopen(NULL, "rb", tmp);
+	MALLOC(res_dict, struct bdict, 1);
+	CLEAR(res_dict, struct bdict, 1);
+	parser_ctrl(res_dict, tmp);
+	fclose(tmp);
+
+	*(struct bdict**)userdata = res_dict;
 
 	return i;
 }
